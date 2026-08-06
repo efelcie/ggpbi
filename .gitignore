@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.tmp/
+webpack.statistics*.html
+# Keep demo bundle versioned so the local Homebase server always serves the latest build.
+!demo/ggpbi.esm.js
+.pbi-test/
+
+# Power BI Desktop user/machine-local files (per Microsoft PBIP guidance:
+# version .platform and editorSettings.json, but never these)
+demo/pbip/**/.pbi/localSettings.json
+demo/pbip/**/.pbi/cache.abf

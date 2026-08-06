@@ -1,0 +1,59 @@
+{
+  "name": "ggpbi",
+  "version": "0.3.0",
+  "description": "Grammar of Graphics for Power BI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "dev": "tsc -p tsconfig.lib.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo:build": "esbuild src/index.ts --bundle --format=esm --outfile=demo/ggpbi.esm.js --external:nothing",
+    "gallery": "esbuild scripts/build-gallery.mjs --bundle --platform=node --format=cjs --external:jsdom --outfile=.tmp/build-gallery.cjs --log-level=warning && node .tmp/build-gallery.cjs",
+    "demo:pbip-data": "esbuild scripts/build-pbip-tables.mjs --bundle --platform=node --format=cjs --outfile=.tmp/build-pbip-tables.cjs --log-level=warning && node .tmp/build-pbip-tables.cjs",
+    "demo": "npm run demo:build && echo 'Open demo/index.html in a browser'",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "demo:pbip-visual": "node scripts/embed-pbip-visual.mjs",
+    "demo:pbip-pages": "node scripts/build-pbip-pages.mjs",
+    "notices": "node scripts/build-notices.mjs",
+    "publish:public": "node scripts/publish-public.mjs"
+  },
+  "keywords": [
+    "powerbi",
+    "grammar-of-graphics",
+    "visualization",
+    "d3"
+  ],
+  "author": "Peter Flucher",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/efelcie/ggpbi.git"
+  },
+  "homepage": "https://efelcie.github.io/ggpbi/",
+  "bugs": {
+    "url": "https://github.com/efelcie/ggpbi/issues"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/d3": "^7.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "esbuild": "^0.27.3",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "d3": "^7.8.0",
+    "powerbi-visuals-api": "~5.1.0",
+    "powerbi-visuals-utils-formattingmodel": "^6.0.0"
+  }
+}

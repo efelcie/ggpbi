@@ -1,0 +1,47 @@
+{
+  "name": "ggpbi Style Presets",
+  "visualStyles": {
+    "ggpbiGrammarOfGraphics": {
+      "*": {
+        "stylePresets": [
+          {
+            "name": "Grey (Standard)",
+            "properties": {
+              "theme": {
+                "panelFill": { "solid": { "color": "#EBEBEB" } },
+                "gridlineColor": { "solid": { "color": "#ffffff" } },
+                "ink": { "solid": { "color": "#333333" } },
+                "paper": { "solid": { "color": "#ffffff" } },
+                "baseSize": 11
+              }
+            }
+          },
+          {
+            "name": "Minimal",
+            "properties": {
+              "theme": {
+                "panelFill": { "solid": { "color": "#ffffff" } },
+                "gridlineColor": { "solid": { "color": "#e0e0e0" } },
+                "ink": { "solid": { "color": "#333333" } },
+                "paper": { "solid": { "color": "#ffffff" } },
+                "baseSize": 11
+              }
+            }
+          },
+          {
+            "name": "Dark",
+            "properties": {
+              "theme": {
+                "panelFill": { "solid": { "color": "#2d2d2d" } },
+                "gridlineColor": { "solid": { "color": "#444444" } },
+                "ink": { "solid": { "color": "#e0e0e0" } },
+                "paper": { "solid": { "color": "#1a1a1a" } },
+                "baseSize": 11
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

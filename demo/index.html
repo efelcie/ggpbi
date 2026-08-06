@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ggpbi | Grammar of Graphics for Power BI</title>
+  <style>
+    :root {
+      --ink: #19202a;
+      --muted: #667085;
+      --paper: #f7f8fb;
+      --panel: #ffffff;
+      --line: #d9dee8;
+      --code: #171923;
+      --blue: #118dff;
+      --green: #00a676;
+      --orange: #e66c37;
+      --violet: #6b4eff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+      background:
+        linear-gradient(90deg, rgba(25, 32, 42, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(25, 32, 42, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, #ffffff 0%, var(--paper) 62%, #eef2f8 100%);
+      background-size: 40px 40px, 40px 40px, auto;
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    header {
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid var(--line);
+      color: var(--ink);
+      padding: 18px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+    }
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .brand-mark {
+      align-items: center;
+      background:
+        linear-gradient(135deg, rgba(17, 141, 255, 0.16), rgba(0, 166, 118, 0.14)),
+        #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      display: flex;
+      font-size: 15px;
+      font-weight: 800;
+      height: 44px;
+      justify-content: center;
+      letter-spacing: 0;
+      width: 44px;
+    }
+    .brand-copy { min-width: 0; }
+    header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+    .header-actions {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .geom-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      padding: 6px 9px;
+    }
+    .download-link {
+      background: var(--ink);
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 12px;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .download-link:hover {
+      background: #303846;
+      transform: translateY(-1px);
+    }
+
+    .playground {
+      display: grid;
+      grid-template-columns: 292px 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 0;
+      min-height: calc(100vh - 81px);
+    }
+
+    .controls {
+      grid-row: 1 / -1;
+      background: rgba(255, 255, 255, 0.92);
+      border-right: 1px solid var(--line);
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .controls h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: var(--muted);
+      margin: 20px 0 8px;
+    }
+    .controls h2:first-child { margin-top: 0; }
+
+    .control-group {
+      margin-bottom: 12px;
+    }
+    .control-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #344054;
+    }
+    .control-group select,
+    .control-group input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .control-group select:focus,
+    .control-group input:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(17, 141, 255, 0.14);
+    }
+
+    .geom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .geom-btn {
+      padding: 8px 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      text-align: center;
+      font-size: 12px;
+      transition: all 0.15s ease;
+    }
+    .geom-btn:hover { border-color: var(--blue); background: #f3f9ff; }
+    .geom-btn.active { border-color: var(--blue); background: #e8f2ff; font-weight: 700; }
+    .geom-btn svg { display: block; margin: 0 auto 4px; }
+
+    .layer-list {
+      list-style: none;
+      margin: 8px 0;
+    }
+    .layer-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: #f3f5f9;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .layer-list .remove-btn {
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px;
+    }
+    .layer-list .remove-btn:hover { color: #e74c3c; }
+
+    .add-layer-btn {
+      width: 100%;
+      padding: 6px;
+      border: 1px dashed #b8c0cf;
+      border-radius: 8px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .add-layer-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+    .chart-panel {
+      grid-column: 2 / -1;
+      grid-row: 1;
+      background:
+        linear-gradient(90deg, rgba(25, 32, 42, 0.025) 1px, transparent 1px),
+        linear-gradient(rgba(25, 32, 42, 0.025) 1px, transparent 1px),
+        #ffffff;
+      background-size: 32px 32px, 32px 32px, auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      border-bottom: 1px solid var(--line);
+      position: relative;
+      min-height: 320px;
+    }
+    .chart-panel .chart-container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .spec-panel {
+      grid-column: 2 / -1;
+      grid-row: 2;
+      background: var(--code);
+      padding: 16px;
+      overflow: auto;
+      border-bottom: 1px solid var(--line);
+      min-height: 240px;
+    }
+    .spec-panel h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .spec-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 12px;
+    }
+    .spec-tab {
+      padding: 6px 14px;
+      border: none;
+      background: #252936;
+      color: #a5adbb;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .spec-tab:first-child { border-radius: 4px 0 0 0; }
+    .spec-tab:last-child { border-radius: 0 4px 0 0; }
+    .spec-tab.active { color: #fff; border-bottom-color: var(--blue); background: #303646; }
+    .spec-tab:hover:not(.active) { color: #bbb; }
+
+    .spec-content {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #e0e0e0;
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    .json-key { color: #82aaff; }
+    .json-string { color: #c3e88d; }
+    .json-number { color: #f78c6c; }
+    .json-bool { color: #c792ea; }
+    .json-null { color: #666; }
+    .r-func { color: #82aaff; }
+    .r-arg { color: #f78c6c; }
+    .r-string { color: #c3e88d; }
+    .r-op { color: #89ddff; }
+    .r-comment { color: #666; }
+
+    .aes-display {
+      font-size: 12px;
+      margin: 8px 0;
+    }
+    .aes-display .aes-row {
+      display: flex;
+      align-items: center;
+      padding: 4px 0;
+      gap: 6px;
+    }
+    .aes-display .aes-name {
+      font-weight: 600;
+      color: #118DFF;
+      width: 50px;
+      font-size: 11px;
+    }
+    .aes-display .aes-arrow { color: #ccc; }
+    .aes-display .aes-field {
+      font-family: monospace;
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1000px) {
+      .playground {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(320px, 1fr) minmax(240px, 1fr);
+        height: auto;
+      }
+      .controls {
+        grid-row: auto;
+      border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+      .chart-panel {
+        grid-column: 1;
+        grid-row: 2;
+      }
+      .spec-panel {
+        grid-column: 1;
+        grid-row: 3;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .header-actions {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark">gg</div>
+        <div class="brand-copy">
+          <h1>ggpbi</h1>
+          <p>ggplot2-inspired grammar for Power BI custom visuals. Compose geoms, inspect the spec, package the visual.</p>
+        </div>
+      </div>
+      <div class="header-actions" aria-label="Project actions">
+        <span class="geom-chip">point</span>
+        <span class="geom-chip">line</span>
+        <span class="geom-chip">bar</span>
+        <span class="geom-chip">area</span>
+        <a class="download-link" href="https://github.com/efelcie/ggpbi/releases/latest">Download .pbiviz</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="playground">
+    <!-- Controls -->
+    <div class="controls">
+      <h2>Datensatz</h2>
+      <div class="control-group">
+        <select id="dataset">
+          <option value="sales">Umsatz nach Region</option>
+          <option value="timeseries">Zeitreihe (Monate)</option>
+          <option value="categories">Kategorien</option>
+          <option value="iris">Iris (Scatter)</option>
+        </select>
+      </div>
+
+      <h2>Aesthetics</h2>
+      <div class="aes-display" id="aes-display"></div>
+
+      <h2>Geometry Layers</h2>
+      <ul class="layer-list" id="layer-list"></ul>
+      <div class="geom-grid" style="margin-top: 8px;">
+        <button class="geom-btn" data-geom="point" title="Punkte">
+          <svg width="28" height="20" viewBox="0 0 28 20">
+            <circle cx="5" cy="15" r="2.5" fill="#118DFF"/>
+            <circle cx="10" cy="8" r="2.5" fill="#118DFF"/>
+            <circle cx="16" cy="12" r="2.5" fill="#118DFF"/>
+            <circle cx="22" cy="4" r="2.5" fill="#118DFF"/>
+          </svg>
+          point
+        </button>
+        <button class="geom-btn" data-geom="line" title="Linie">
+          <svg width="28" height="20" viewBox="0 0 28 20">
+            <polyline points="2,16 9,8 17,12 26,3" fill="none" stroke="#118DFF" stroke-width="2"/>
+          </svg>
+          line
+        </button>
+        <button class="geom-btn" data-geom="bar" title="Balken">
+          <svg width="28" height="20" viewBox="0 0 28 20">
+            <rect x="2" y="10" width="5" height="10" fill="#118DFF"/>
+            <rect x="9" y="4" width="5" height="16" fill="#118DFF"/>
+            <rect x="16" y="8" width="5" height="12" fill="#118DFF"/>
+            <rect x="23" y="2" width="5" height="18" fill="#118DFF" opacity="0.7"/>
+          </svg>
+          bar
+        </button>
+        <button class="geom-btn" data-geom="area" title="Fläche">
+          <svg width="28" height="20" viewBox="0 0 28 20">
+            <polygon points="2,18 9,8 17,12 26,4 26,18" fill="#118DFF" opacity="0.3"/>
+            <polyline points="2,18 9,8 17,12 26,4" fill="none" stroke="#118DFF" stroke-width="1.5"/>
+          </svg>
+          area
+        </button>
+        <button class="geom-btn" data-geom="text" title="Text">
+          <svg width="28" height="20" viewBox="0 0 28 20">
+            <text x="4" y="12" font-size="8" fill="#118DFF" font-weight="600">Aa</text>
+            <text x="16" y="16" font-size="8" fill="#118DFF" font-weight="600">Bb</text>
+          </svg>
+          text
+        </button>
+      </div>
+
+      <h2>Scale</h2>
+      <div class="control-group">
+        <label>X-Achse</label>
+        <select id="scale-x">
+          <option value="auto">auto</option>
+          <option value="linear">linear</option>
+          <option value="log">log</option>
+          <option value="sqrt">sqrt</option>
+          <option value="time">time</option>
+          <option value="ordinal">ordinal</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Y-Achse</label>
+        <select id="scale-y">
+          <option value="auto">auto</option>
+          <option value="linear">linear</option>
+          <option value="log">log</option>
+          <option value="sqrt">sqrt</option>
+        </select>
+      </div>
+
+      <h2>Optionen</h2>
+      <div class="control-group">
+        <label>Alpha (Transparenz)</label>
+        <input type="range" id="alpha" min="0.1" max="1" step="0.05" value="1">
+      </div>
+      <div class="control-group">
+        <label>Size (Punkt/Linie)</label>
+        <input type="range" id="size" min="1" max="20" step="0.5" value="4">
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-container" id="playground-chart"></div>
+    </div>
+
+    <!-- Spec view -->
+    <div class="spec-panel">
+      <div class="spec-tabs">
+        <button class="spec-tab active" data-tab="spec">Spec</button>
+        <button class="spec-tab" data-tab="ggplot">ggplot2</button>
+        <button class="spec-tab" data-tab="api">API Call</button>
+      </div>
+      <div class="spec-content" id="spec-output"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { ggpbi } from './ggpbi.esm.js';
+
+    // ── Datasets ──
+    const datasets = {
+      sales: () => {
+        const regions = ['Nord', 'Süd', 'Ost', 'West'];
+        const data = [];
+        for (let i = 0; i < 50; i++) {
+          data.push({
+            Preis: Math.round(10 + Math.random() * 90),
+            Umsatz: Math.round(5 + Math.random() * 50 + (Math.random() > 0.5 ? 20 : 0)),
+            Region: regions[Math.floor(Math.random() * regions.length)]
+          });
+        }
+        return {
+          data,
+          aes: { x: 'Preis', y: 'Umsatz', color: 'Region' },
+          defaultGeom: 'point'
+        };
+      },
+      timeseries: () => {
+        const data = [];
+        for (const product of ['Produkt A', 'Produkt B']) {
+          let base = product === 'Produkt A' ? 100 : 60;
+          for (let m = 1; m <= 12; m++) {
+            data.push({
+              Monat: m,
+              Umsatz: Math.round(base + Math.sin(m / 2) * 20 + Math.random() * 10),
+              Produkt: product
+            });
+          }
+        }
+        return {
+          data,
+          aes: { x: 'Monat', y: 'Umsatz', color: 'Produkt' },
+          defaultGeom: 'line'
+        };
+      },
+      categories: () => ({
+        data: [
+          { Kategorie: 'Elektronik', Wert: 420 },
+          { Kategorie: 'Kleidung', Wert: 310 },
+          { Kategorie: 'Lebensmittel', Wert: 280 },
+          { Kategorie: 'Bücher', Wert: 190 },
+          { Kategorie: 'Sport', Wert: 350 },
+        ],
+        aes: { x: 'Kategorie', y: 'Wert', color: 'Kategorie' },
+        defaultGeom: 'bar'
+      }),
+      iris: () => {
+        // Simplified iris-like data
+        const species = ['setosa', 'versicolor', 'virginica'];
+        const data = [];
+        for (const s of species) {
+          const base = s === 'setosa' ? [5.0, 3.4] : s === 'versicolor' ? [5.9, 2.8] : [6.6, 3.0];
+          for (let i = 0; i < 20; i++) {
+            data.push({
+              sepal_length: +(base[0] + (Math.random() - 0.5) * 1.5).toFixed(1),
+              sepal_width: +(base[1] + (Math.random() - 0.5) * 1.0).toFixed(1),
+              species: s
+            });
+          }
+        }
+        return {
+          data,
+          aes: { x: 'sepal_length', y: 'sepal_width', color: 'species' },
+          defaultGeom: 'point'
+        };
+      }
+    };
+
+    // ── State ──
+    let state = {
+      dataset: 'sales',
+      layers: [{ type: 'point' }],
+      scaleX: 'auto',
+      scaleY: 'auto',
+      alpha: 1,
+      size: 4,
+      activeTab: 'spec'
+    };
+
+    // ── DOM refs ──
+    const chartEl = document.getElementById('playground-chart');
+    const specOutput = document.getElementById('spec-output');
+    const layerListEl = document.getElementById('layer-list');
+    const aesDisplayEl = document.getElementById('aes-display');
+    const datasetSelect = document.getElementById('dataset');
+    const scaleXSelect = document.getElementById('scale-x');
+    const scaleYSelect = document.getElementById('scale-y');
+    const alphaInput = document.getElementById('alpha');
+    const sizeInput = document.getElementById('size');
+
+    // ── Render ──
+    function update() {
+      const ds = datasets[state.dataset]();
+
+      // Build the spec via fluent API
+      const builder = ggpbi()
+        .data(ds.data)
+        .aes(ds.aes);
+
+      // Add each layer
+      for (const layer of state.layers) {
+        const opts = {};
+        if (state.alpha < 1) opts.alpha = state.alpha;
+        if (layer.type === 'point' && state.size !== 4) opts.size = state.size;
+        if (layer.type === 'line' && state.size !== 4) opts.size = state.size / 2;
+        builder.geom(layer.type, Object.keys(opts).length > 0 ? opts : undefined);
+      }
+
+      // Scales
+      if (state.scaleX !== 'auto' || state.scaleY !== 'auto') {
+        const sc = {};
+        if (state.scaleX !== 'auto') sc.x = state.scaleX;
+        if (state.scaleY !== 'auto') sc.y = state.scaleY;
+        builder.scale(sc);
+      }
+
+      // Get chart dimensions from container
+      const rect = chartEl.getBoundingClientRect();
+      const w = Math.max(320, rect.width - 48);
+      const h = Math.max(240, rect.height - 48);
+      builder.size(w, h);
+
+      // Get the spec BEFORE rendering (for display)
+      const spec = builder.spec();
+
+      // Render
+      builder.renderTo(chartEl);
+
+      // Update aes display
+      updateAesDisplay(ds.aes);
+
+      // Update spec output
+      updateSpecOutput(spec, ds.aes);
+    }
+
+    function updateAesDisplay(aes) {
+      aesDisplayEl.innerHTML = Object.entries(aes)
+        .map(([k, v]) => `
+          <div class="aes-row">
+            <span class="aes-name">${k}</span>
+            <span class="aes-arrow">&rarr;</span>
+            <span class="aes-field">${v}</span>
+          </div>
+        `).join('');
+    }
+
+    function updateSpecOutput(spec, aes) {
+      if (state.activeTab === 'spec') {
+        const displaySpec = { ...spec };
+        displaySpec.data = `[${spec.data.length} rows]`;
+        Object.keys(displaySpec).forEach(k => {
+          if (displaySpec[k] === undefined) delete displaySpec[k];
+        });
+        specOutput.innerHTML = highlightJSON(JSON.stringify(displaySpec, null, 2));
+      } else if (state.activeTab === 'ggplot') {
+        specOutput.innerHTML = highlightR(specToGgplot(spec));
+      } else if (state.activeTab === 'api') {
+        specOutput.innerHTML = highlightJS(specToApiCall(spec));
+      }
+    }
+
+    // ── Spec → ggplot2 R code ──
+    function specToGgplot(spec) {
+      const aesArgs = Object.entries(spec.aes)
+        .map(([k, v]) => `${k} = ${v}`)
+        .join(', ');
+
+      let code = `ggplot(data, aes(${aesArgs}))`;
+
+      for (const geom of spec.geoms) {
+        const args = [];
+        if (geom.alpha != null) args.push(`alpha = ${geom.alpha}`);
+        if (geom.size != null) args.push(`size = ${geom.size}`);
+        if (geom.color != null) args.push(`color = "${geom.color}"`);
+        code += ` +\n  geom_${geom.type}(${args.join(', ')})`;
+      }
+
+      if (spec.scales?.x) {
+        const fn = spec.scales.x === 'linear' ? 'continuous' :
+                   spec.scales.x === 'log' ? 'log10' :
+                   spec.scales.x === 'sqrt' ? 'sqrt' :
+                   spec.scales.x === 'time' ? 'date' : spec.scales.x;
+        code += ` +\n  scale_x_${fn}()`;
+      }
+      if (spec.scales?.y) {
+        const fn = spec.scales.y === 'linear' ? 'continuous' :
+                   spec.scales.y === 'log' ? 'log10' :
+                   spec.scales.y === 'sqrt' ? 'sqrt' : spec.scales.y;
+        code += ` +\n  scale_y_${fn}()`;
+      }
+
+      return code;
+    }
+
+    // ── Spec → ggpbi API call ──
+    function specToApiCall(spec) {
+      const aesStr = JSON.stringify(spec.aes);
+      let code = `ggpbi()\n  .data(data)\n  .aes(${aesStr})`;
+
+      for (const geom of spec.geoms) {
+        const opts = {};
+        if (geom.alpha != null) opts.alpha = geom.alpha;
+        if (geom.size != null) opts.size = geom.size;
+        if (geom.color != null) opts.color = geom.color;
+        const optsStr = Object.keys(opts).length > 0
+          ? `, ${JSON.stringify(opts)}`
+          : '';
+        code += `\n  .geom('${geom.type}'${optsStr})`;
+      }
+
+      if (spec.scales) {
+        code += `\n  .scale(${JSON.stringify(spec.scales)})`;
+      }
+
+      code += `\n  .renderTo(container)`;
+      return code;
+    }
+
+    // ── Syntax highlighting ──
+    function highlightJSON(json) {
+      return json
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+        .replace(/: (\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+        .replace(/: (true|false)/g, ': <span class="json-bool">$1</span>')
+        .replace(/: (null)/g, ': <span class="json-null">$1</span>');
+    }
+
+    function highlightR(code) {
+      return code
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/(ggplot|aes|geom_\w+|scale_[xy]_\w+|theme_\w+)/g, '<span class="r-func">$1</span>')
+        .replace(/(\w+)\s*=/g, '<span class="r-arg">$1</span> =')
+        .replace(/"([^"]*)"/g, '<span class="r-string">"$1"</span>')
+        .replace(/(\+)/g, '<span class="r-op">$1</span>')
+        .replace(/(#.*)/g, '<span class="r-comment">$1</span>');
+    }
+
+    function highlightJS(code) {
+      return code
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\.(data|aes|geom|scale|renderTo|size|theme)/g, '.<span class="r-func">$1</span>')
+        .replace(/(ggpbi)/g, '<span class="r-func">$1</span>')
+        .replace(/'([^']*)'/g, '<span class="r-string">\'$1\'</span>')
+        .replace(/(\d+\.?\d*)/g, '<span class="json-number">$1</span>');
+    }
+
+    // ── Layer management ──
+    function renderLayers() {
+      layerListEl.innerHTML = state.layers.map((l, i) => `
+        <li>
+          <span>geom_${l.type}</span>
+          <button class="remove-btn" data-idx="${i}">&times;</button>
+        </li>
+      `).join('');
+
+      // Remove handlers
+      layerListEl.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          if (state.layers.length > 1) {
+            state.layers.splice(idx, 1);
+            renderLayers();
+            update();
+          }
+        });
+      });
+    }
+
+    // ── Event listeners ──
+    datasetSelect.addEventListener('change', (e) => {
+      state.dataset = e.target.value;
+      const ds = datasets[state.dataset]();
+      state.layers = [{ type: ds.defaultGeom }];
+      renderLayers();
+      update();
+    });
+
+    // Geom buttons add layers
+    document.querySelectorAll('.geom-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const geom = btn.dataset.geom;
+        state.layers.push({ type: geom });
+        renderLayers();
+        update();
+      });
+    });
+
+    scaleXSelect.addEventListener('change', (e) => {
+      state.scaleX = e.target.value;
+      update();
+    });
+
+    scaleYSelect.addEventListener('change', (e) => {
+      state.scaleY = e.target.value;
+      update();
+    });
+
+    alphaInput.addEventListener('input', (e) => {
+      state.alpha = parseFloat(e.target.value);
+      update();
+    });
+
+    sizeInput.addEventListener('input', (e) => {
+      state.size = parseFloat(e.target.value);
+      update();
+    });
+
+    // Tab switching
+    document.querySelectorAll('.spec-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.spec-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        state.activeTab = tab.dataset.tab;
+        update();
+      });
+    });
+
+    // Resize handler
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(update, 150);
+    });
+
+    // ── Init ──
+    renderLayers();
+    update();
+  </script>
+</body>
+</html>

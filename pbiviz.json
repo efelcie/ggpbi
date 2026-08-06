@@ -1,0 +1,25 @@
+{
+  "visual": {
+    "name": "ggpbi",
+    "displayName": "ggpbi - Grammar of Graphics",
+    "guid": "ggpbiGrammarOfGraphics",
+    "visualClassName": "Visual",
+    "version": "0.3.0.0",
+    "description": "A layered graphics system for Power BI, inspired by ggplot2",
+    "supportUrl": "https://github.com/efelcie/ggpbi",
+    "gitHubUrl": "https://github.com/efelcie/ggpbi"
+  },
+  "apiVersion": "5.1.0",
+  "author": {
+    "name": "efelcie",
+    "email": "mail@peter.flucher.name"
+  },
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "code": {
+    "typescript": "src/pbi-visual.ts"
+  }
+}

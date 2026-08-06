@@ -1,0 +1,2351 @@
+{
+  "dataRoles": [
+    {
+      "name": "x",
+      "kind": "GroupingOrMeasure",
+      "displayName": "X",
+      "displayNameKey": "Visual_X",
+      "description": "X axis (category or measure). Use 'Don't summarize' for raw numeric values. A 2nd/3rd measure feeds segment ends (x2) and point ranges (x2=min, x3=max)."
+    },
+    {
+      "name": "y",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Y",
+      "displayNameKey": "Visual_Y",
+      "description": "Y axis values. Each field maps to a layer (up to 3). Use 'Don't summarize' for raw values."
+    },
+    {
+      "name": "color",
+      "kind": "Grouping",
+      "displayName": "Color",
+      "displayNameKey": "Visual_Color",
+      "description": "Color grouping (legend)"
+    },
+    {
+      "name": "size",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Size",
+      "displayNameKey": "Visual_Size",
+      "description": "Point size for bubble charts. Use 'Don't summarize' for raw values."
+    },
+    {
+      "name": "tooltip",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Tooltips",
+      "displayNameKey": "Visual_Tooltip",
+      "description": "Additional tooltip fields"
+    },
+    {
+      "name": "detail",
+      "kind": "Grouping",
+      "displayName": "Detail",
+      "displayNameKey": "Visual_Detail",
+      "description": "Point identity/detail grouping. Use this to draw one point per item when X or Y is a measure."
+    },
+    {
+      "name": "label",
+      "kind": "GroupingOrMeasure",
+      "displayName": "Label",
+      "displayNameKey": "Visual_Label",
+      "description": "Text labels for geom_text layers. Blank values are not drawn."
+    },
+    {
+      "name": "facet",
+      "kind": "Grouping",
+      "displayName": "Facet",
+      "displayNameKey": "Visual_Facet",
+      "description": "Small multiples (one panel per category)"
+    }
+  ],
+  "dataViewMappings": [
+    {
+      "conditions": [
+        {
+          "x": {
+            "max": 3
+          },
+          "y": {
+            "max": 3
+          },
+          "color": {
+            "max": 1
+          },
+          "size": {
+            "max": 1
+          },
+          "detail": {
+            "max": 1
+          },
+          "label": {
+            "max": 1
+          },
+          "facet": {
+            "max": 1
+          }
+        }
+      ],
+      "categorical": {
+        "categories": {
+          "select": [
+            {
+              "for": {
+                "in": "x"
+              }
+            },
+            {
+              "for": {
+                "in": "y"
+              }
+            },
+            {
+              "for": {
+                "in": "color"
+              }
+            },
+            {
+              "for": {
+                "in": "detail"
+              }
+            },
+            {
+              "for": {
+                "in": "label"
+              }
+            },
+            {
+              "for": {
+                "in": "size"
+              }
+            },
+            {
+              "for": {
+                "in": "facet"
+              }
+            }
+          ],
+          "dataReductionAlgorithm": {
+            "sample": {
+              "count": 30000
+            }
+          }
+        },
+        "values": {
+          "group": {
+            "by": "color",
+            "select": [
+              {
+                "bind": {
+                  "to": "x"
+                }
+              },
+              {
+                "bind": {
+                  "to": "y"
+                }
+              },
+              {
+                "bind": {
+                  "to": "size"
+                }
+              },
+              {
+                "bind": {
+                  "to": "label"
+                }
+              },
+              {
+                "bind": {
+                  "to": "tooltip"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "objects": {
+    "layer1": {
+      "displayName": "Layer 1",
+      "properties": {
+        "enabled": {
+          "displayName": "Active",
+          "type": {
+            "bool": true
+          }
+        },
+        "type": {
+          "displayName": "Type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "bar",
+                "displayName": "Bar"
+              },
+              {
+                "value": "point",
+                "displayName": "Point"
+              },
+              {
+                "value": "line",
+                "displayName": "Line"
+              },
+              {
+                "value": "area",
+                "displayName": "Area"
+              },
+              {
+                "value": "text",
+                "displayName": "Text"
+              },
+              {
+                "value": "boxplot",
+                "displayName": "Boxplot"
+              },
+              {
+                "value": "histogram",
+                "displayName": "Histogram"
+              },
+              {
+                "value": "smooth",
+                "displayName": "Smooth"
+              },
+              {
+                "value": "segment",
+                "displayName": "Segment"
+              },
+              {
+                "value": "pointrange",
+                "displayName": "Point range"
+              },
+              {
+                "value": "density",
+                "displayName": "Density"
+              },
+              {
+                "value": "violin",
+                "displayName": "Violin"
+              }
+            ]
+          }
+        },
+        "yField": {
+          "displayName": "Y field",
+          "description": "Which Y field this layer uses (ggplot2: aes(y=) override per layer). Works for both measures and raw Y fields (Don't summarize).",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "y1",
+                "displayName": "1. Y field"
+              },
+              {
+                "value": "y2",
+                "displayName": "2. Y field"
+              },
+              {
+                "value": "y3",
+                "displayName": "3. Y field"
+              }
+            ]
+          }
+        },
+        "alpha": {
+          "displayName": "Transparency",
+          "type": {
+            "numeric": true
+          }
+        },
+        "size": {
+          "displayName": "Size",
+          "type": {
+            "numeric": true
+          }
+        },
+        "fill": {
+          "displayName": "Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "lineStyle": {
+          "displayName": "Line type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "solid",
+                "displayName": "Solid"
+              },
+              {
+                "value": "dashed",
+                "displayName": "Dashed"
+              },
+              {
+                "value": "dotted",
+                "displayName": "Dotted"
+              },
+              {
+                "value": "dashdot",
+                "displayName": "Dash-dot"
+              },
+              {
+                "value": "longdash",
+                "displayName": "Long dashed"
+              },
+              {
+                "value": "twodash",
+                "displayName": "Two-dash"
+              }
+            ]
+          }
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "identity",
+                "displayName": "Identity"
+              },
+              {
+                "value": "stack",
+                "displayName": "Stacked"
+              },
+              {
+                "value": "dodge",
+                "displayName": "Dodge"
+              },
+              {
+                "value": "dodge2",
+                "displayName": "Dodge (padded)"
+              },
+              {
+                "value": "fill",
+                "displayName": "Fill (100%)"
+              },
+              {
+                "value": "jitter",
+                "displayName": "Jitter"
+              }
+            ]
+          }
+        },
+        "just": {
+          "displayName": "Bar alignment",
+          "type": {
+            "numeric": true
+          }
+        },
+        "orientation": {
+          "displayName": "Orientation",
+          "type": {
+            "enumeration": [
+              {
+                "value": "x",
+                "displayName": "Vertical"
+              },
+              {
+                "value": "y",
+                "displayName": "Horizontal"
+              }
+            ]
+          }
+        },
+        "shape": {
+          "displayName": "Shape",
+          "type": {
+            "enumeration": [
+              {
+                "value": "circle",
+                "displayName": "Circle"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              },
+              {
+                "value": "triangle",
+                "displayName": "Triangle"
+              },
+              {
+                "value": "diamond",
+                "displayName": "Diamond"
+              },
+              {
+                "value": "circleOpen",
+                "displayName": "Circle (open)"
+              },
+              {
+                "value": "squareOpen",
+                "displayName": "Square (open)"
+              },
+              {
+                "value": "triangleOpen",
+                "displayName": "Triangle (open)"
+              },
+              {
+                "value": "diamondOpen",
+                "displayName": "Diamond (open)"
+              },
+              {
+                "value": "circleFilled",
+                "displayName": "Circle (border)"
+              },
+              {
+                "value": "squareFilled",
+                "displayName": "Square (border)"
+              },
+              {
+                "value": "triangleFilled",
+                "displayName": "Triangle (border)"
+              },
+              {
+                "value": "diamondFilled",
+                "displayName": "Diamond (border)"
+              },
+              {
+                "value": "plus",
+                "displayName": "Plus"
+              },
+              {
+                "value": "cross",
+                "displayName": "Cross"
+              },
+              {
+                "value": "asterisk",
+                "displayName": "Asterisk"
+              },
+              {
+                "value": "star",
+                "displayName": "Star"
+              }
+            ]
+          }
+        },
+        "pointFill": {
+          "displayName": "Point fill",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "strokeWidth": {
+          "displayName": "Stroke width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterWidth": {
+          "displayName": "Jitter width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterHeight": {
+          "displayName": "Jitter height",
+          "type": {
+            "numeric": true
+          }
+        },
+        "lineEnd": {
+          "displayName": "Line cap",
+          "type": {
+            "enumeration": [
+              {
+                "value": "butt",
+                "displayName": "Butt"
+              },
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              }
+            ]
+          }
+        },
+        "lineJoin": {
+          "displayName": "Line join",
+          "type": {
+            "enumeration": [
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "miter",
+                "displayName": "Miter"
+              },
+              {
+                "value": "bevel",
+                "displayName": "Bevel"
+              }
+            ]
+          }
+        },
+        "arrowShow": {
+          "displayName": "Show arrow",
+          "type": {
+            "bool": true
+          }
+        },
+        "arrowEnds": {
+          "displayName": "Arrow position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "last",
+                "displayName": "End"
+              },
+              {
+                "value": "first",
+                "displayName": "Start"
+              },
+              {
+                "value": "both",
+                "displayName": "Both"
+              }
+            ]
+          }
+        },
+        "arrowType": {
+          "displayName": "Arrow type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "open",
+                "displayName": "Open"
+              },
+              {
+                "value": "closed",
+                "displayName": "Closed"
+              }
+            ]
+          }
+        },
+        "arrowLength": {
+          "displayName": "Arrow length",
+          "type": {
+            "numeric": true
+          }
+        },
+        "arrowAngle": {
+          "displayName": "Arrow angle",
+          "type": {
+            "numeric": true
+          }
+        },
+        "filter": {
+          "displayName": "Filter rows",
+          "description": "Restrict this layer to a subset of rows: Min / Max keep the row with the lowest / highest value on the continuous axis per category, Extremes keeps both (dumbbell ends).",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "All rows",
+                "value": "none"
+              },
+              {
+                "displayName": "Min",
+                "value": "min"
+              },
+              {
+                "displayName": "Max",
+                "value": "max"
+              },
+              {
+                "displayName": "Extremes (min + max)",
+                "value": "extremes"
+              }
+            ]
+          }
+        },
+        "labelTemplate": {
+          "displayName": "Label template",
+          "description": "Template for label text, e.g. '{label} {x:.1%}'. Placeholders {label}, {x}, {y}; optional d3-format spec after the colon.",
+          "type": {
+            "text": true
+          }
+        },
+        "repel": {
+          "displayName": "Repel labels",
+          "description": "Text labels find non-overlapping positions (like ggrepel); displaced labels get a connector line.",
+          "type": {
+            "bool": true
+          }
+        },
+        "applyHighlight": {
+          "displayName": "Apply highlight",
+          "description": "Whether the Highlight card affects this layer. Off = the layer keeps full colours (text layers: all labels).",
+          "type": {
+            "bool": true
+          }
+        }
+      }
+    },
+    "layer2": {
+      "displayName": "Layer 2",
+      "properties": {
+        "enabled": {
+          "displayName": "Active",
+          "type": {
+            "bool": true
+          }
+        },
+        "type": {
+          "displayName": "Type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "bar",
+                "displayName": "Bar"
+              },
+              {
+                "value": "point",
+                "displayName": "Point"
+              },
+              {
+                "value": "line",
+                "displayName": "Line"
+              },
+              {
+                "value": "area",
+                "displayName": "Area"
+              },
+              {
+                "value": "text",
+                "displayName": "Text"
+              },
+              {
+                "value": "boxplot",
+                "displayName": "Boxplot"
+              },
+              {
+                "value": "histogram",
+                "displayName": "Histogram"
+              },
+              {
+                "value": "smooth",
+                "displayName": "Smooth"
+              },
+              {
+                "value": "segment",
+                "displayName": "Segment"
+              },
+              {
+                "value": "pointrange",
+                "displayName": "Point range"
+              },
+              {
+                "value": "density",
+                "displayName": "Density"
+              },
+              {
+                "value": "violin",
+                "displayName": "Violin"
+              }
+            ]
+          }
+        },
+        "yField": {
+          "displayName": "Y field",
+          "description": "Which Y field this layer uses (ggplot2: aes(y=) override per layer). Works for both measures and raw Y fields (Don't summarize).",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "y1",
+                "displayName": "1. Y field"
+              },
+              {
+                "value": "y2",
+                "displayName": "2. Y field"
+              },
+              {
+                "value": "y3",
+                "displayName": "3. Y field"
+              }
+            ]
+          }
+        },
+        "alpha": {
+          "displayName": "Transparency",
+          "type": {
+            "numeric": true
+          }
+        },
+        "size": {
+          "displayName": "Size",
+          "type": {
+            "numeric": true
+          }
+        },
+        "fill": {
+          "displayName": "Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "lineStyle": {
+          "displayName": "Line type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "solid",
+                "displayName": "Solid"
+              },
+              {
+                "value": "dashed",
+                "displayName": "Dashed"
+              },
+              {
+                "value": "dotted",
+                "displayName": "Dotted"
+              },
+              {
+                "value": "dashdot",
+                "displayName": "Dash-dot"
+              },
+              {
+                "value": "longdash",
+                "displayName": "Long dashed"
+              },
+              {
+                "value": "twodash",
+                "displayName": "Two-dash"
+              }
+            ]
+          }
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "identity",
+                "displayName": "Identity"
+              },
+              {
+                "value": "stack",
+                "displayName": "Stacked"
+              },
+              {
+                "value": "dodge",
+                "displayName": "Dodge"
+              },
+              {
+                "value": "dodge2",
+                "displayName": "Dodge (padded)"
+              },
+              {
+                "value": "fill",
+                "displayName": "Fill (100%)"
+              },
+              {
+                "value": "jitter",
+                "displayName": "Jitter"
+              }
+            ]
+          }
+        },
+        "just": {
+          "displayName": "Bar alignment",
+          "type": {
+            "numeric": true
+          }
+        },
+        "orientation": {
+          "displayName": "Orientation",
+          "type": {
+            "enumeration": [
+              {
+                "value": "x",
+                "displayName": "Vertical"
+              },
+              {
+                "value": "y",
+                "displayName": "Horizontal"
+              }
+            ]
+          }
+        },
+        "shape": {
+          "displayName": "Shape",
+          "type": {
+            "enumeration": [
+              {
+                "value": "circle",
+                "displayName": "Circle"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              },
+              {
+                "value": "triangle",
+                "displayName": "Triangle"
+              },
+              {
+                "value": "diamond",
+                "displayName": "Diamond"
+              },
+              {
+                "value": "circleOpen",
+                "displayName": "Circle (open)"
+              },
+              {
+                "value": "squareOpen",
+                "displayName": "Square (open)"
+              },
+              {
+                "value": "triangleOpen",
+                "displayName": "Triangle (open)"
+              },
+              {
+                "value": "diamondOpen",
+                "displayName": "Diamond (open)"
+              },
+              {
+                "value": "circleFilled",
+                "displayName": "Circle (border)"
+              },
+              {
+                "value": "squareFilled",
+                "displayName": "Square (border)"
+              },
+              {
+                "value": "triangleFilled",
+                "displayName": "Triangle (border)"
+              },
+              {
+                "value": "diamondFilled",
+                "displayName": "Diamond (border)"
+              },
+              {
+                "value": "plus",
+                "displayName": "Plus"
+              },
+              {
+                "value": "cross",
+                "displayName": "Cross"
+              },
+              {
+                "value": "asterisk",
+                "displayName": "Asterisk"
+              },
+              {
+                "value": "star",
+                "displayName": "Star"
+              }
+            ]
+          }
+        },
+        "pointFill": {
+          "displayName": "Point fill",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "strokeWidth": {
+          "displayName": "Stroke width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterWidth": {
+          "displayName": "Jitter width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterHeight": {
+          "displayName": "Jitter height",
+          "type": {
+            "numeric": true
+          }
+        },
+        "lineEnd": {
+          "displayName": "Line cap",
+          "type": {
+            "enumeration": [
+              {
+                "value": "butt",
+                "displayName": "Butt"
+              },
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              }
+            ]
+          }
+        },
+        "lineJoin": {
+          "displayName": "Line join",
+          "type": {
+            "enumeration": [
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "miter",
+                "displayName": "Miter"
+              },
+              {
+                "value": "bevel",
+                "displayName": "Bevel"
+              }
+            ]
+          }
+        },
+        "arrowShow": {
+          "displayName": "Show arrow",
+          "type": {
+            "bool": true
+          }
+        },
+        "arrowEnds": {
+          "displayName": "Arrow position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "last",
+                "displayName": "End"
+              },
+              {
+                "value": "first",
+                "displayName": "Start"
+              },
+              {
+                "value": "both",
+                "displayName": "Both"
+              }
+            ]
+          }
+        },
+        "arrowType": {
+          "displayName": "Arrow type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "open",
+                "displayName": "Open"
+              },
+              {
+                "value": "closed",
+                "displayName": "Closed"
+              }
+            ]
+          }
+        },
+        "arrowLength": {
+          "displayName": "Arrow length",
+          "type": {
+            "numeric": true
+          }
+        },
+        "arrowAngle": {
+          "displayName": "Arrow angle",
+          "type": {
+            "numeric": true
+          }
+        },
+        "filter": {
+          "displayName": "Filter rows",
+          "description": "Restrict this layer to a subset of rows: Min / Max keep the row with the lowest / highest value on the continuous axis per category, Extremes keeps both (dumbbell ends).",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "All rows",
+                "value": "none"
+              },
+              {
+                "displayName": "Min",
+                "value": "min"
+              },
+              {
+                "displayName": "Max",
+                "value": "max"
+              },
+              {
+                "displayName": "Extremes (min + max)",
+                "value": "extremes"
+              }
+            ]
+          }
+        },
+        "labelTemplate": {
+          "displayName": "Label template",
+          "description": "Template for label text, e.g. '{label} {x:.1%}'. Placeholders {label}, {x}, {y}; optional d3-format spec after the colon.",
+          "type": {
+            "text": true
+          }
+        },
+        "repel": {
+          "displayName": "Repel labels",
+          "description": "Text labels find non-overlapping positions (like ggrepel); displaced labels get a connector line.",
+          "type": {
+            "bool": true
+          }
+        },
+        "applyHighlight": {
+          "displayName": "Apply highlight",
+          "description": "Whether the Highlight card affects this layer. Off = the layer keeps full colours (text layers: all labels).",
+          "type": {
+            "bool": true
+          }
+        }
+      }
+    },
+    "layer3": {
+      "displayName": "Layer 3",
+      "properties": {
+        "enabled": {
+          "displayName": "Active",
+          "type": {
+            "bool": true
+          }
+        },
+        "type": {
+          "displayName": "Type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "bar",
+                "displayName": "Bar"
+              },
+              {
+                "value": "point",
+                "displayName": "Point"
+              },
+              {
+                "value": "line",
+                "displayName": "Line"
+              },
+              {
+                "value": "area",
+                "displayName": "Area"
+              },
+              {
+                "value": "text",
+                "displayName": "Text"
+              },
+              {
+                "value": "boxplot",
+                "displayName": "Boxplot"
+              },
+              {
+                "value": "histogram",
+                "displayName": "Histogram"
+              },
+              {
+                "value": "smooth",
+                "displayName": "Smooth"
+              },
+              {
+                "value": "segment",
+                "displayName": "Segment"
+              },
+              {
+                "value": "pointrange",
+                "displayName": "Point range"
+              },
+              {
+                "value": "density",
+                "displayName": "Density"
+              },
+              {
+                "value": "violin",
+                "displayName": "Violin"
+              }
+            ]
+          }
+        },
+        "yField": {
+          "displayName": "Y field",
+          "description": "Which Y field this layer uses (ggplot2: aes(y=) override per layer). Works for both measures and raw Y fields (Don't summarize).",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "y1",
+                "displayName": "1. Y field"
+              },
+              {
+                "value": "y2",
+                "displayName": "2. Y field"
+              },
+              {
+                "value": "y3",
+                "displayName": "3. Y field"
+              }
+            ]
+          }
+        },
+        "alpha": {
+          "displayName": "Transparency",
+          "type": {
+            "numeric": true
+          }
+        },
+        "size": {
+          "displayName": "Size",
+          "type": {
+            "numeric": true
+          }
+        },
+        "fill": {
+          "displayName": "Color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "lineStyle": {
+          "displayName": "Line type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "solid",
+                "displayName": "Solid"
+              },
+              {
+                "value": "dashed",
+                "displayName": "Dashed"
+              },
+              {
+                "value": "dotted",
+                "displayName": "Dotted"
+              },
+              {
+                "value": "dashdot",
+                "displayName": "Dash-dot"
+              },
+              {
+                "value": "longdash",
+                "displayName": "Long dashed"
+              },
+              {
+                "value": "twodash",
+                "displayName": "Two-dash"
+              }
+            ]
+          }
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "identity",
+                "displayName": "Identity"
+              },
+              {
+                "value": "stack",
+                "displayName": "Stacked"
+              },
+              {
+                "value": "dodge",
+                "displayName": "Dodge"
+              },
+              {
+                "value": "dodge2",
+                "displayName": "Dodge (padded)"
+              },
+              {
+                "value": "fill",
+                "displayName": "Fill (100%)"
+              },
+              {
+                "value": "jitter",
+                "displayName": "Jitter"
+              }
+            ]
+          }
+        },
+        "just": {
+          "displayName": "Bar alignment",
+          "type": {
+            "numeric": true
+          }
+        },
+        "orientation": {
+          "displayName": "Orientation",
+          "type": {
+            "enumeration": [
+              {
+                "value": "x",
+                "displayName": "Vertical"
+              },
+              {
+                "value": "y",
+                "displayName": "Horizontal"
+              }
+            ]
+          }
+        },
+        "shape": {
+          "displayName": "Shape",
+          "type": {
+            "enumeration": [
+              {
+                "value": "circle",
+                "displayName": "Circle"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              },
+              {
+                "value": "triangle",
+                "displayName": "Triangle"
+              },
+              {
+                "value": "diamond",
+                "displayName": "Diamond"
+              },
+              {
+                "value": "circleOpen",
+                "displayName": "Circle (open)"
+              },
+              {
+                "value": "squareOpen",
+                "displayName": "Square (open)"
+              },
+              {
+                "value": "triangleOpen",
+                "displayName": "Triangle (open)"
+              },
+              {
+                "value": "diamondOpen",
+                "displayName": "Diamond (open)"
+              },
+              {
+                "value": "circleFilled",
+                "displayName": "Circle (border)"
+              },
+              {
+                "value": "squareFilled",
+                "displayName": "Square (border)"
+              },
+              {
+                "value": "triangleFilled",
+                "displayName": "Triangle (border)"
+              },
+              {
+                "value": "diamondFilled",
+                "displayName": "Diamond (border)"
+              },
+              {
+                "value": "plus",
+                "displayName": "Plus"
+              },
+              {
+                "value": "cross",
+                "displayName": "Cross"
+              },
+              {
+                "value": "asterisk",
+                "displayName": "Asterisk"
+              },
+              {
+                "value": "star",
+                "displayName": "Star"
+              }
+            ]
+          }
+        },
+        "pointFill": {
+          "displayName": "Point fill",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "strokeWidth": {
+          "displayName": "Stroke width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterWidth": {
+          "displayName": "Jitter width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "jitterHeight": {
+          "displayName": "Jitter height",
+          "type": {
+            "numeric": true
+          }
+        },
+        "lineEnd": {
+          "displayName": "Line cap",
+          "type": {
+            "enumeration": [
+              {
+                "value": "butt",
+                "displayName": "Butt"
+              },
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              }
+            ]
+          }
+        },
+        "lineJoin": {
+          "displayName": "Line join",
+          "type": {
+            "enumeration": [
+              {
+                "value": "round",
+                "displayName": "Round"
+              },
+              {
+                "value": "miter",
+                "displayName": "Miter"
+              },
+              {
+                "value": "bevel",
+                "displayName": "Bevel"
+              }
+            ]
+          }
+        },
+        "arrowShow": {
+          "displayName": "Show arrow",
+          "type": {
+            "bool": true
+          }
+        },
+        "arrowEnds": {
+          "displayName": "Arrow position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "last",
+                "displayName": "End"
+              },
+              {
+                "value": "first",
+                "displayName": "Start"
+              },
+              {
+                "value": "both",
+                "displayName": "Both"
+              }
+            ]
+          }
+        },
+        "arrowType": {
+          "displayName": "Arrow type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "open",
+                "displayName": "Open"
+              },
+              {
+                "value": "closed",
+                "displayName": "Closed"
+              }
+            ]
+          }
+        },
+        "arrowLength": {
+          "displayName": "Arrow length",
+          "type": {
+            "numeric": true
+          }
+        },
+        "arrowAngle": {
+          "displayName": "Arrow angle",
+          "type": {
+            "numeric": true
+          }
+        },
+        "filter": {
+          "displayName": "Filter rows",
+          "description": "Restrict this layer to a subset of rows: Min / Max keep the row with the lowest / highest value on the continuous axis per category, Extremes keeps both (dumbbell ends).",
+          "type": {
+            "enumeration": [
+              {
+                "displayName": "All rows",
+                "value": "none"
+              },
+              {
+                "displayName": "Min",
+                "value": "min"
+              },
+              {
+                "displayName": "Max",
+                "value": "max"
+              },
+              {
+                "displayName": "Extremes (min + max)",
+                "value": "extremes"
+              }
+            ]
+          }
+        },
+        "labelTemplate": {
+          "displayName": "Label template",
+          "description": "Template for label text, e.g. '{label} {x:.1%}'. Placeholders {label}, {x}, {y}; optional d3-format spec after the colon.",
+          "type": {
+            "text": true
+          }
+        },
+        "repel": {
+          "displayName": "Repel labels",
+          "description": "Text labels find non-overlapping positions (like ggrepel); displaced labels get a connector line.",
+          "type": {
+            "bool": true
+          }
+        },
+        "applyHighlight": {
+          "displayName": "Apply highlight",
+          "description": "Whether the Highlight card affects this layer. Off = the layer keeps full colours (text layers: all labels).",
+          "type": {
+            "bool": true
+          }
+        }
+      }
+    },
+    "scaleX": {
+      "displayName": "X Axis",
+      "properties": {
+        "type": {
+          "displayName": "Scale type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "linear",
+                "displayName": "Linear"
+              },
+              {
+                "value": "log",
+                "displayName": "Logarithmic"
+              },
+              {
+                "value": "sqrt",
+                "displayName": "Square root"
+              },
+              {
+                "value": "time",
+                "displayName": "Time"
+              },
+              {
+                "value": "ordinal",
+                "displayName": "Ordinal (discrete)"
+              },
+              {
+                "value": "category",
+                "displayName": "Category (discrete)"
+              }
+            ]
+          }
+        },
+        "label": {
+          "displayName": "Axis title",
+          "type": {
+            "text": true
+          }
+        },
+        "labelFormat": {
+          "displayName": "Label format",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "thousands",
+                "displayName": "Thousands separator"
+              },
+              {
+                "value": "compact",
+                "displayName": "Compact (1.2M)"
+              },
+              {
+                "value": "currency",
+                "displayName": "Currency"
+              },
+              {
+                "value": "percent",
+                "displayName": "Percent"
+              }
+            ]
+          },
+          "description": "Number format for the tick labels. Separators, symbols and compact suffixes follow the report locale."
+        },
+        "dateFormat": {
+          "displayName": "Date format",
+          "description": "Granularity for a time axis. Auto follows the tick spacing; month names always come from the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "year",
+                "displayName": "Year (2015)"
+              },
+              {
+                "value": "monthYear",
+                "displayName": "Month and year (Mar 2015)"
+              },
+              {
+                "value": "monthDay",
+                "displayName": "Month and day (Mar 15)"
+              },
+              {
+                "value": "date",
+                "displayName": "Full date"
+              },
+              {
+                "value": "dateTime",
+                "displayName": "Date and time"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "scaleY": {
+      "displayName": "Y Axis",
+      "properties": {
+        "type": {
+          "displayName": "Scale type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "linear",
+                "displayName": "Linear"
+              },
+              {
+                "value": "log",
+                "displayName": "Logarithmic"
+              },
+              {
+                "value": "sqrt",
+                "displayName": "Square root"
+              },
+              {
+                "value": "time",
+                "displayName": "Time"
+              },
+              {
+                "value": "ordinal",
+                "displayName": "Ordinal (discrete)"
+              },
+              {
+                "value": "category",
+                "displayName": "Category (discrete)"
+              }
+            ]
+          }
+        },
+        "label": {
+          "displayName": "Axis title",
+          "type": {
+            "text": true
+          }
+        },
+        "labelFormat": {
+          "displayName": "Label format",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "thousands",
+                "displayName": "Thousands separator"
+              },
+              {
+                "value": "compact",
+                "displayName": "Compact (1.2M)"
+              },
+              {
+                "value": "currency",
+                "displayName": "Currency"
+              },
+              {
+                "value": "percent",
+                "displayName": "Percent"
+              }
+            ]
+          },
+          "description": "Number format for the tick labels. Separators, symbols and compact suffixes follow the report locale."
+        },
+        "dateFormat": {
+          "displayName": "Date format",
+          "description": "Granularity for a time axis. Auto follows the tick spacing; month names always come from the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "auto",
+                "displayName": "Auto"
+              },
+              {
+                "value": "year",
+                "displayName": "Year (2015)"
+              },
+              {
+                "value": "monthYear",
+                "displayName": "Month and year (Mar 2015)"
+              },
+              {
+                "value": "monthDay",
+                "displayName": "Month and day (Mar 15)"
+              },
+              {
+                "value": "date",
+                "displayName": "Full date"
+              },
+              {
+                "value": "dateTime",
+                "displayName": "Date and time"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "legend": {
+      "displayName": "Legend",
+      "properties": {
+        "show": {
+          "displayName": "Show legend",
+          "type": {
+            "bool": true
+          }
+        },
+        "position": {
+          "displayName": "Position",
+          "type": {
+            "enumeration": [
+              {
+                "value": "right",
+                "displayName": "Right"
+              },
+              {
+                "value": "bottom",
+                "displayName": "Bottom"
+              },
+              {
+                "value": "top",
+                "displayName": "Top"
+              },
+              {
+                "value": "left",
+                "displayName": "Left"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "boxplot": {
+      "displayName": "Boxplot",
+      "properties": {
+        "coef": {
+          "displayName": "Whisker length (IQR ×)",
+          "type": {
+            "numeric": true
+          }
+        },
+        "notch": {
+          "displayName": "Notch",
+          "type": {
+            "bool": true
+          }
+        },
+        "notchWidth": {
+          "displayName": "Notch width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "varWidth": {
+          "displayName": "Variable width (√n)",
+          "type": {
+            "bool": true
+          }
+        },
+        "stapleWidth": {
+          "displayName": "Staple width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "fatten": {
+          "displayName": "Median line thickness (×)",
+          "type": {
+            "numeric": true
+          }
+        },
+        "boxWidth": {
+          "displayName": "Box width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "boxFillColor": {
+          "displayName": "Fill color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "outlierShow": {
+          "displayName": "Show outliers",
+          "type": {
+            "bool": true
+          }
+        },
+        "outlierSize": {
+          "displayName": "Outlier size",
+          "type": {
+            "numeric": true
+          }
+        },
+        "outlierShape": {
+          "displayName": "Outlier shape",
+          "type": {
+            "enumeration": [
+              {
+                "value": "circle",
+                "displayName": "Circle"
+              },
+              {
+                "value": "square",
+                "displayName": "Square"
+              },
+              {
+                "value": "triangle",
+                "displayName": "Triangle"
+              },
+              {
+                "value": "diamond",
+                "displayName": "Diamond"
+              },
+              {
+                "value": "circleOpen",
+                "displayName": "Circle (open)"
+              },
+              {
+                "value": "plus",
+                "displayName": "Plus"
+              },
+              {
+                "value": "cross",
+                "displayName": "Cross"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "histogram": {
+      "displayName": "Histogram",
+      "properties": {
+        "bins": {
+          "displayName": "Number of bins",
+          "type": {
+            "numeric": true
+          }
+        },
+        "binwidth": {
+          "displayName": "Bin width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "boundary": {
+          "displayName": "Boundary",
+          "type": {
+            "numeric": true
+          }
+        },
+        "center": {
+          "displayName": "Center",
+          "type": {
+            "numeric": true
+          }
+        },
+        "closed": {
+          "displayName": "Closed side",
+          "type": {
+            "enumeration": [
+              {
+                "value": "right",
+                "displayName": "Right"
+              },
+              {
+                "value": "left",
+                "displayName": "Left"
+              }
+            ]
+          }
+        },
+        "pad": {
+          "displayName": "Pad with empty bins",
+          "type": {
+            "bool": true
+          }
+        },
+        "drop": {
+          "displayName": "Drop empty bins",
+          "type": {
+            "enumeration": [
+              {
+                "value": "none",
+                "displayName": "None"
+              },
+              {
+                "value": "all",
+                "displayName": "All"
+              },
+              {
+                "value": "extremes",
+                "displayName": "Extremes"
+              }
+            ]
+          }
+        },
+        "histYAxis": {
+          "displayName": "Y-axis statistic",
+          "type": {
+            "enumeration": [
+              {
+                "value": "count",
+                "displayName": "Count"
+              },
+              {
+                "value": "density",
+                "displayName": "Density"
+              },
+              {
+                "value": "ncount",
+                "displayName": "Normalized count"
+              },
+              {
+                "value": "ndensity",
+                "displayName": "Normalized density"
+              }
+            ]
+          }
+        },
+        "histFillColor": {
+          "displayName": "Fill color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "histBorderColor": {
+          "displayName": "Border color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "histBorderWidth": {
+          "displayName": "Border width",
+          "type": {
+            "numeric": true
+          }
+        },
+        "histBorderStyle": {
+          "displayName": "Border line type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "solid",
+                "displayName": "Solid"
+              },
+              {
+                "value": "dashed",
+                "displayName": "Dashed"
+              },
+              {
+                "value": "dotted",
+                "displayName": "Dotted"
+              },
+              {
+                "value": "dashdot",
+                "displayName": "Dash-dot"
+              },
+              {
+                "value": "longdash",
+                "displayName": "Long dashed"
+              },
+              {
+                "value": "twodash",
+                "displayName": "Two-dash"
+              }
+            ]
+          }
+        },
+        "histTransparency": {
+          "displayName": "Transparency",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "smooth": {
+      "displayName": "Smooth",
+      "properties": {
+        "method": {
+          "displayName": "Method",
+          "type": {
+            "enumeration": [
+              {
+                "value": "loess",
+                "displayName": "LOESS"
+              },
+              {
+                "value": "lm",
+                "displayName": "Linear (lm)"
+              },
+              {
+                "value": "movingAverage",
+                "displayName": "Moving average"
+              }
+            ]
+          }
+        },
+        "se": {
+          "displayName": "Show confidence interval",
+          "type": {
+            "bool": true
+          }
+        },
+        "level": {
+          "displayName": "Confidence level",
+          "type": {
+            "numeric": true
+          }
+        },
+        "span": {
+          "displayName": "Span (LOESS)",
+          "type": {
+            "numeric": true
+          }
+        },
+        "n": {
+          "displayName": "Output points",
+          "type": {
+            "numeric": true
+          }
+        },
+        "fullrange": {
+          "displayName": "Full range",
+          "type": {
+            "bool": true
+          }
+        },
+        "smoothFillColor": {
+          "displayName": "Ribbon color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "fillAlpha": {
+          "displayName": "Ribbon opacity",
+          "type": {
+            "numeric": true
+          }
+        },
+        "lineWidth": {
+          "displayName": "Line width",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "theme": {
+      "displayName": "Theme",
+      "properties": {
+        "preset": {
+          "displayName": "Preset",
+          "description": "Base theme; the colour pickers below override individual parts.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "grey",
+                "displayName": "Grey (ggplot2 default)"
+              },
+              {
+                "value": "minimal",
+                "displayName": "Minimal"
+              },
+              {
+                "value": "dark",
+                "displayName": "Dark"
+              }
+            ]
+          }
+        },
+        "panelFill": {
+          "displayName": "Background",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "gridlineColor": {
+          "displayName": "Grid color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "ink": {
+          "displayName": "Text color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "paper": {
+          "displayName": "Paper color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "baseSize": {
+          "displayName": "Font size",
+          "type": {
+            "numeric": true
+          }
+        },
+        "subtitle": {
+          "displayName": "Describe the chart",
+          "description": "A line above the plot stating what is shown, including transformations the visual applied itself (summing, binning, an auto-picked geom). 'Auto' only shows it when there is something to explain.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "off",
+                "displayName": "Off"
+              },
+              {
+                "value": "auto",
+                "displayName": "Auto (when something is computed)"
+              },
+              {
+                "value": "always",
+                "displayName": "Always"
+              }
+            ]
+          }
+        },
+        "warnAggregated": {
+          "displayName": "Warn about aggregated rows",
+          "description": "Say so when a row-counting chart (histogram, count bars, boxplot, density, violin) runs on data where no field identifies a row — Power BI may have collapsed duplicates before the visual saw them.",
+          "type": {
+            "bool": true
+          }
+        },
+        "showCode": {
+          "displayName": "Show ggpbi code (debug)",
+          "description": "Overlay the ggpbi code that would produce this chart — for learning the API, copying a chart into the library, or attaching a reproducible example to a bug report.",
+          "type": {
+            "bool": true
+          }
+        },
+        "currency": {
+          "displayName": "Currency code",
+          "description": "ISO 4217 code used when an axis label format is set to Currency (EUR, USD, CHF). Symbol and placement follow the report locale.",
+          "type": {
+            "text": true
+          }
+        }
+      }
+    },
+    "highlight": {
+      "displayName": "Highlight",
+      "properties": {
+        "enabled": {
+          "displayName": "Enabled",
+          "type": {
+            "bool": true
+          }
+        },
+        "values": {
+          "displayName": "Highlight values",
+          "description": "Comma-separated values of the Color field to highlight; everything else turns grey and leaves the legend (like R's gghighlight).",
+          "type": {
+            "text": true
+          }
+        },
+        "color": {
+          "displayName": "Unhighlighted color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "distribution": {
+      "displayName": "Distribution (Density / Violin)",
+      "properties": {
+        "adjust": {
+          "displayName": "Smoothing (adjust)",
+          "description": "Bandwidth multiplier: 0.5 = wigglier, 2 = smoother. Default 1.",
+          "type": {
+            "numeric": true
+          }
+        },
+        "trim": {
+          "displayName": "Trim density to data range",
+          "description": "Density layers: clip the curve to the observed data range (ggplot2 trim, default off).",
+          "type": {
+            "bool": true
+          }
+        },
+        "violinTrim": {
+          "displayName": "Trim violin to data range",
+          "description": "Violin layers: clip each violin to its group's data range (ggplot2 trim, default on).",
+          "type": {
+            "bool": true
+          }
+        },
+        "densityFill": {
+          "displayName": "Fill under curve",
+          "description": "Density layers: fill the area under the curve with the line colour.",
+          "type": {
+            "bool": true
+          }
+        },
+        "fillAlpha": {
+          "displayName": "Fill transparency",
+          "description": "Opacity of the filled area (0-1).",
+          "type": {
+            "numeric": true
+          }
+        },
+        "violinScale": {
+          "displayName": "Violin width scaling",
+          "type": {
+            "enumeration": [
+              {
+                "value": "area",
+                "displayName": "Equal area"
+              },
+              {
+                "value": "count",
+                "displayName": "Area by count"
+              },
+              {
+                "value": "width",
+                "displayName": "Equal width"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "referenceLines": {
+      "displayName": "Reference Lines",
+      "properties": {
+        "show": {
+          "displayName": "Show",
+          "type": {
+            "bool": true
+          }
+        },
+        "hlineAt": {
+          "displayName": "Horizontal line(s) at",
+          "description": "Y positions: numbers (comma-separated) or 'mean' / 'median' of the Y values. Example: mean, 30",
+          "type": {
+            "text": true
+          }
+        },
+        "vlineAt": {
+          "displayName": "Vertical line(s) at",
+          "description": "X positions: numbers (comma-separated) or 'mean' / 'median' of the X values.",
+          "type": {
+            "text": true
+          }
+        },
+        "lineColor": {
+          "displayName": "Line color",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
+        "lineStyle": {
+          "displayName": "Line type",
+          "type": {
+            "enumeration": [
+              {
+                "value": "solid",
+                "displayName": "Solid"
+              },
+              {
+                "value": "dashed",
+                "displayName": "Dashed"
+              },
+              {
+                "value": "dotted",
+                "displayName": "Dotted"
+              },
+              {
+                "value": "dotdash",
+                "displayName": "Dot-dash"
+              },
+              {
+                "value": "longdash",
+                "displayName": "Long dash"
+              },
+              {
+                "value": "twodash",
+                "displayName": "Two dash"
+              }
+            ]
+          }
+        },
+        "lineWidth": {
+          "displayName": "Line width",
+          "type": {
+            "numeric": true
+          }
+        }
+      }
+    },
+    "facet": {
+      "displayName": "Facets (Small Multiples)",
+      "properties": {
+        "columns": {
+          "displayName": "Columns",
+          "description": "Number of grid columns. 0 = automatic, like ggplot2's facet_wrap: a roughly square grid (6 panels → 3 × 2).",
+          "type": {
+            "numeric": true
+          }
+        },
+        "freeX": {
+          "displayName": "Free X scale",
+          "description": "Each panel scales its X axis to its own data (ggplot2 scales = \"free_x\"). Needed when every panel covers a different range, e.g. one decade each.",
+          "type": {
+            "bool": true
+          }
+        },
+        "freeY": {
+          "displayName": "Free Y scale",
+          "description": "Each panel scales its Y axis to its own data (ggplot2 scales = \"free_y\").",
+          "type": {
+            "bool": true
+          }
+        }
+      }
+    }
+  },
+  "supportsHighlight": true,
+  "supportsMultiVisualSelection": true,
+  "supportsKeyboardFocus": true,
+  "supportsLandingPage": true,
+  "privileges": []
+}

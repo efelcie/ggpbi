@@ -1,0 +1,18 @@
+export { pointsToScene } from './point';
+export { linesToScene } from './line';
+export { barsToScene } from './bar';
+export { areaToScene } from './area';
+export { textToScene } from './text';
+export { boxplotToScene, computeBoxplotStats } from './boxplot';
+export type { BoxplotStats } from './boxplot';
+export { histogramToScene } from './histogram';
+export { smoothToScene } from './smooth';
+export { densityToScene } from './density';
+export { violinToScene } from './violin';
+export { hlineToScene } from './hline';
+export { vlineToScene } from './vline';
+export { ablineToScene } from './abline';
+export { segmentsToScene } from './segment';
+export { pointrangeToScene } from './pointrange';
+export { sceneBuilders, type SceneBuilder } from './registry';
+export { filterNA } from './util';
