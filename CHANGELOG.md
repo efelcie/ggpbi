@@ -1,5 +1,10 @@
 # ggpbi Development Log
 
+## 2026-08-07 - v0.3.1
+
+- Corrected the release metadata so the npm package, Power BI visual, GitHub tag, and `.pbiviz` download all report version `0.3.1`.
+- Rebuilt and republished the release after an earlier tag-only attempt produced a `v0.3.1` GitHub Release containing the `0.3.0` visual metadata.
+
 ## 2026-08-06 - v0.3.0
 
 - Prepared the public/private repository split and publishing workflow.

@@ -1,6 +1,6 @@
 {
   "name": "ggpbi",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Grammar of Graphics for Power BI",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
