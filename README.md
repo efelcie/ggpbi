@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/brand/logo.svg" alt="ggpbi — Grammar of Graphics for Power BI" width="520">
+</p>
+
 # ggpbi — Grammar of Graphics for Power BI
 
 **Build ggplot2-style charts in Power BI. No R, no Python, no runtime to install.**
