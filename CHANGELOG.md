@@ -1,5 +1,23 @@
 # ggpbi Development Log
 
+## 2026-08-07 - v0.4.0
+
+- Added the ggpbi brand logo and replaced the placeholder visual icon, so the
+  Visualizations pane in Power BI now shows the real mark. Also added the
+  store thumbnail and the repository social preview image.
+- Added a private release workflow that packages the PBIP demo as a ZIP and
+  uploads it to the matching public GitHub Release without publishing the
+  report source tree.
+- Documented the PBIP demo download and the required cross-repository release
+  token setup.
+- Made ggpbir an editing contract for tooling, with a generated JSON Schema,
+  reference documentation, and validation coverage.
+- Added feature-oriented public publishing and no-release try builds, with
+  documented versioning rules for Power BI visual changes.
+- Tied the release version across `package.json`, `pbiviz.json`,
+  `package-lock.json` and this file to a single number, and made the release
+  workflow refuse a tag that disagrees with the tree.
+
 ## 2026-08-07 - v0.3.1
 
 - Corrected the release metadata so the npm package, Power BI visual, GitHub tag, and `.pbiviz` download all report version `0.3.1`.

@@ -20,8 +20,25 @@ jobs:
           node-version: 20
           cache: npm
 
+      # The build takes its metadata from the tree, not from the tag — the tag
+      # name only reaches the asset filename. Tagging a tree whose version was
+      # never bumped is how v0.3.1 shipped a visual reporting 0.3.0.
+      - name: Tag must match the version in the tree
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${PKG}."
+            echo "Publish the version bump to main, then tag the commit that carries it."
+            exit 1
+          fi
+          echo "tag ${GITHUB_REF_NAME} matches package.json ${PKG}"
+
       - run: npm ci
       - run: npm run build
+      # Includes tests/version-consistency.test.ts, which ties package.json,
+      # pbiviz.json, package-lock.json and the CHANGELOG together.
+      - run: npm test
 
       - name: Install Power BI visuals tools
         run: npm install -g powerbi-visuals-tools

@@ -1,6 +1,6 @@
 {
   "name": "ggpbi",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Grammar of Graphics for Power BI",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,16 +11,13 @@
     "test:watch": "vitest",
     "demo:build": "esbuild src/index.ts --bundle --format=esm --outfile=demo/ggpbi.esm.js --external:nothing",
     "gallery": "esbuild scripts/build-gallery.mjs --bundle --platform=node --format=cjs --external:jsdom --outfile=.tmp/build-gallery.cjs --log-level=warning && node .tmp/build-gallery.cjs",
-    "demo:pbip-data": "esbuild scripts/build-pbip-tables.mjs --bundle --platform=node --format=cjs --outfile=.tmp/build-pbip-tables.cjs --log-level=warning && node .tmp/build-pbip-tables.cjs",
     "demo": "npm run demo:build && echo 'Open demo/index.html in a browser'",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "demo:pbip-visual": "node scripts/embed-pbip-visual.mjs",
-    "demo:pbip-pages": "node scripts/build-pbip-pages.mjs",
     "notices": "node scripts/build-notices.mjs",
-    "publish:public": "node scripts/publish-public.mjs"
+    "ggpbir-schema": "node scripts/build-ggpbir-schema.mjs"
   },
   "keywords": [
     "powerbi",
@@ -42,6 +39,7 @@
     "@eslint/js": "^10.0.1",
     "@types/d3": "^7.4.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "ajv": "^8.20.0",
     "esbuild": "^0.27.3",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",

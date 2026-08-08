@@ -1864,13 +1864,15 @@ For the full PBI guide see [examples/powerbi-integration.md](../examples/powerbi
 2. Import into Power BI Desktop
 3. Assign fields (see data roles below)
 
-**Want a ready-made report?** [`demo/pbip/`](../demo/pbip/README.md) is a
-text-based Power BI project with the classic gallery datasets inlined
-and the ggpbi visual **embedded** — open the `.pbip` in Desktop, done.
-It has one dashboard page per dataset (ggpbi visuals mixed with native
-slicers), two showcase pages and the whole sample gallery grouped by
-topic, all on 1800×750 canvases. Refresh the embedded visual after a
-release with `pbiviz package` + `npm run demo:pbip-visual`.
+**Want a ready-made report?** Every
+[release](https://github.com/efelcie/ggpbi/releases) carries a
+`GgpbiDemo-<version>.zip` under **Assets** — a text-based Power BI project
+with the classic gallery datasets inlined and the ggpbi visual
+**embedded**. Extract it and open the `.pbip` in Desktop, done (click
+**Refresh** once on first open to build the local model cache). It has one
+dashboard page per dataset (ggpbi visuals mixed with native slicers), two
+showcase pages and the whole sample gallery grouped by topic, all on
+1800×750 canvases.
 4. Format Pane: configure geometry, style, scales, legend
 
 ### Data Roles (Aesthetics)

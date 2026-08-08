@@ -38,6 +38,14 @@ above is what the Format Pane produces. (Switch on **Theme → Show ggpbi code
 The visual is not on AppSource yet, so Power BI will warn that it comes from
 an untrusted source. That is expected for a file import.
 
+## Demo report
+
+Each release also provides `GgpbiDemo-<version>.zip` under **Assets**. Extract
+it and open `GgpbiDemo/GgpbiDemo.pbip` in Power BI Desktop. The demo embeds the
+matching ggpbi visual and uses inlined sample data, so it needs no external
+data source. On first open, click **Refresh** once to build the local model
+cache.
+
 ## Your first chart
 
 Drop a field into **X** and one into **Y** — that is enough. ggpbi picks a
