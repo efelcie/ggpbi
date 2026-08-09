@@ -1,5 +1,28 @@
 # ggpbi Development Log
 
+## 2026-08-09 - v0.5.0
+
+- Turned the code view into a real editor (CodeMirror): edit the generated
+  code and the chart follows. Optional vim mode with the full emulation
+  (normal/insert/visual, registers, search); in vim, edits apply themselves
+  after two quiet seconds.
+- Edits write back into the Format Pane — editor and pane are two doors into
+  the same room. Deleted lines revert their properties to the pane defaults;
+  applied edits are durable, closing the panel never resets the chart.
+- The editor speaks three languages, switchable in the status bar: the ggpbi
+  fluent chain, ggplot2 (R), and ggpbir (the report JSON, objects editable,
+  wells read-only). Switching languages re-renders the same state.
+- The "Edit" entry in the visual's own menu (advanced edit mode) opens a
+  Deneb-style split view: editor left, chart right.
+- Autocomplete for methods, geoms, aesthetics, options, theme keys and the
+  bound well fields; DAX-editor look with line numbers and active-line
+  highlight; type zoom via Ctrl+wheel, Ctrl+plus/minus/0 and the A− / A+
+  status-bar items.
+- Host-owned values (color palette, high contrast, locale) appear greyed in
+  the code and stay the host's — edits to them are ignored.
+- Sized bars on a continuous axis by resolution, like ggplot2.
+- The debug view code can be edited and re-rendered in the browser demo.
+
 ## 2026-08-07 - v0.4.0
 
 - Added the ggpbi brand logo and replaced the placeholder visual icon, so the

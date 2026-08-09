@@ -435,6 +435,8 @@ The legend appears automatically when `color` aesthetic is mapped.
 | `subtitle` | enum | `auto` | `off`, `auto`, `always` | Line above the plot describing what is shown. `auto` appears only when the visual computed something itself (sum, count, bins, density, auto-picked geom) |
 | `currency` | text | `EUR` | ISO 4217 code | Currency used when an axis `labelFormat` is `currency`. Symbol and placement follow the report locale |
 | `showCode` | bool | `false` | true/false | Debug view: overlay the ggpbi code that would produce this chart (field names as bound in the wells, pre-stat mapping, non-defaults only) |
+| `vimMode` | bool | `false` | true/false | Modal (vim-style) editing in the code overlay's editor. A default — `Ctrl+M` in the editor overrides it for the session; set it in a report theme's `visualStyles` to hold for every ggpbi visual in the report |
+| `codeSyntax` | enum | `ggpbi` | `ggpbi`, `ggplot2`, `ggpbir` | Which language the code overlay speaks: the fluent ggpbi chain, ggplot2 (R), or ggpbir — this document's own visual.json shape, objects editable and persisted, wells greyed read-only |
 | `warnAggregated` | bool | `true` | true/false | Warn above the panel when a row-counting chart runs on data where no bound field is unique per row — Power BI may have collapsed duplicates first. Data notices appear regardless of `subtitle` |
 | `preset` | enum | `grey` | `grey`, `minimal`, `dark` | Base theme (see below). The colour properties override individual parts of it — but only when they differ from the grey defaults, so untouched pickers never cancel a preset |
 | `panelFill` | color | `#EBEBEB` | any color | Plot area background |

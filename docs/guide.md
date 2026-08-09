@@ -2071,7 +2071,7 @@ would produce the same chart:
 
 ```typescript
 ggpbi()
-  .data(data)                       // 32 rows
+  .data(data)
   .aes({ x: 'wt', y: 'mpg', color: 'cyl', label: 'name' })
   .geom('point', { size: 5, alpha: 0.8 })
   .geom('smooth', { method: 'lm' })
@@ -2088,9 +2088,9 @@ Three properties make it trustworthy:
   rewrites `y` to `__count` internally — the code shows the `x` mapping
   that produces that count.
 - **Only non-defaults appear.** A dump of every resolved option would bury
-  the two lines that matter. Long arrays are summarised for the same
-  reason — every Power BI chart carries the report theme's palette, and
-  32 hex strings tell you nothing you chose: `colorPalette: [/* 32 values */]`.
+  the two lines that matter. What does appear, appears whole: arrays,
+  the report palette included, are spelled out in full — the code hides
+  nothing behind a summary.
 
 It is an *overlay*: switching it on never resizes the chart underneath, and
 switching it off leaves the plot exactly as it was. **Copy** puts the text
@@ -2100,6 +2100,132 @@ way, so `Ctrl+C` always works. In the fluent API: `.showCode()`.
 Use it to learn the API from a chart you built by clicking, to lift a
 report chart into the library, or to attach a reproducible example to a
 bug report.
+
+### Editing the code
+
+In Power BI the code is not just readable — the block itself is the
+editor. Click into it and type: the syntax colours and the greyed lines
+stay live while you edit, because the highlight re-renders on every
+keystroke. As soon as the text differs from the chart, **Apply** and
+**Cancel** appear. Apply re-renders the chart from your code; a mistake
+shows up as an error line with a line number and nothing changes until it
+parses. While an edit is applied the header reads *ggpbi code (edited)*.
+Applied edits are durable: closing the panel keeps the chart exactly as
+you left it — there is no reset. Deleting a line is an edit like any
+other; the setting it carried returns to its Format Pane default and
+stays there.
+
+To try it: bind some fields, switch on **Theme → Show ggpbi code
+(debug)**, click into the code, and change `.geom('col')` to
+`.geom('line')` — or add a second layer like
+`.geom('smooth', { method: 'lm' })`.
+
+**Or open it from the visual's own menu.** The **…** menu in the visual
+header carries an **Edit** entry (Power BI's advanced edit mode): it pops
+the visual into focus view with the editor open, whatever the Format
+Pane toggle says — the same door Deneb users know. Leaving the focus
+view hands control back to the pane. In this mode the panel has no ✕;
+the whole view is the editor.
+
+**The panel carries its own controls.** In the header: a **language
+switch** cycling ggpbi → ggplot2 → ggpbir, a **Vim** switch, and **✕**
+to close the overlay. All three write the matching Format Pane property
+(`codeSyntax`, `vimMode`, `showCode`) — the panel is pane state, so its
+buttons are pane writes; reopen it any time via **Theme → Show ggpbi
+code (debug)**.
+
+**Or speak ggplot2.** **Theme → Code syntax** switches the block to R:
+
+```r
+ggplot(data, aes(x = wt, y = mpg, colour = cyl)) +
+  geom_point(alpha = 0.6, size = 3) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~ cyl, ncol = 3)
+```
+
+**Or read the report file itself.** The third language, **ggpbir**,
+shows the visual as the `visual.json` this guide's
+[ggpbir reference](ggpbir-reference.md) documents: `query.queryState`
+(your wells) and `objects` (the Format Pane state, PBIR-literal encoded,
+`"Value": "'point'"` and all). Only `objects` is editable — the rest is
+greyed out, and applying validates every name against the pane before
+persisting, so a typo cannot corrupt the report. Edit
+`"alpha": { "expr": { "Literal": { "Value": "0.4D" } } }`, apply, and
+the slider moves. A block copied from here pastes straight into a
+`.pbip` report file, and back.
+
+The same editor, the same apply — you can paste a chart from an R script
+and watch it render against your Power BI data. The dialect covers what
+ggpbi covers: the `geom_*` family above, `scale_x/y_log10 /
+_continuous(limits = c(…), labels = …)`, `facet_wrap` / `facet_grid`,
+`theme_minimal()` / `theme_dark()` / `theme_ggpbi(…)`,
+`labs(subtitle = …)`, `gghighlight(c(…))` — plus the spellings fingers
+type: positional `aes(wt, mpg)`, `geom_bar(stat = "identity")`, numeric
+shapes (`shape = 17`) and linetypes. Anything outside the dialect
+(`stat_summary`, per-layer `aes()`, `labs(title = )`) fails loudly with
+a line number rather than being silently dropped. Field names still
+come from the wells, in both languages.
+
+**Vim, optionally.** `Ctrl+M` in the editor toggles modal editing — no
+button, just the `-- NORMAL --` / `-- INSERT --` badge next to the panel
+title; whoever recognises it needs no more. The named switch lives in the
+Format Pane (**Theme → Vim mode**), which also makes it report-wide
+material: set `vimMode` for the ggpbi visual in a report theme's
+`visualStyles` and every ggpbi visual in the report starts modal.
+`Ctrl+M` always overrides for the session. And it is not a subset: the
+editor is CodeMirror with its full vim emulation — the same one Replit
+and Obsidian ship. Motions, operators, counts, text objects (`ciw`,
+`di(`), visual mode (`v`, `V`), registers, marks, search (`/`, `n`,
+`N`), the `.` repeat — if your fingers know it, it almost certainly
+works. The badge next to the panel title names the mode
+(`-- NORMAL --`, `-- INSERT --`, `-- VISUAL --`). In normal mode the
+cursor is vim's block, sitting *on* a character. `Esc` leaves insert
+mode — and because some hosts claim that key for themselves, `Ctrl+[`,
+vim's own synonym, always works too.
+
+Modal editing applies by itself: whenever the editor is back in normal
+mode with changed text — `Esc` after typing, or any normal-mode edit
+like `dd` — the chart re-renders immediately. In normal mode, what you
+see *is* the chart. A parse error shows in the strip and leaves the
+chart as it was. The plain editor (vim off) keeps its explicit
+**Apply**/**Cancel** instead.
+
+**Edits write back into the Format Pane.** Applying
+`.geom('line', { alpha: 0.5 })` sets the layer card's type dropdown and
+alpha slider — the edit becomes persisted report configuration, exactly
+as if you had clicked it. Editor and pane are two doors into the same
+room: change something in either, the other follows. Until the pane has
+echoed the new values, a session overlay bridges the gap; the *(edited)*
+label stays only for the parts the pane cannot hold —
+
+- **field bindings** (`.aes(…)`, the facet field): wells are filled by
+  drag and drop, no visual can write them;
+- a **fourth layer** and beyond — there are three layer cards;
+- **scale limits** (`min`/`max`) and free-text subtitles — no slice yet;
+- geom-card details (histogram `bins`, smooth `method`, …) — v1 keeps
+  them overlay.
+
+Those parts remain session-only: closing the report drops them.
+Everything else survives — it lives in the report now. That includes
+deletions: removing `.theme({ panelFill: '#333333' })` writes the
+default panel fill back to the pane, so the chart keeps its reverted
+look after the overlay closes.
+
+What editing can and cannot do:
+
+- The chain is parsed, never executed — the same rules as the generated
+  code: strings, numbers, booleans, arrays, nested objects and
+  `new Date('…')`. Function bodies (like a `filter:` arrow) are accepted
+  but not run; the chart keeps its live behaviour for them.
+- Whatever the code cannot show is preserved: the data itself, the
+  host services and the viewport.
+  Applying the generated code unchanged changes nothing.
+- Fields still come from the wells. `.aes({ x: 'Month' })` names what you
+  dragged in; naming a field that is not bound draws nothing for it.
+- A call you delete is gone: remove `.facet(…)` and the chart unfacets;
+  remove a `.geom(…)` line and that layer disappears. `.data(…)`,
+  `.size(…)` and `.renderTo(…)` are ignored — data and viewport belong to
+  the host — and appear greyed out to say so.
 
 ### Moving the Visual (platform limitation)
 

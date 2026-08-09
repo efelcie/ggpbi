@@ -37,8 +37,9 @@ describe('specToCode', () => {
     expect(code).toMatch(/\.renderTo\(element\);$/);
   });
 
-  it('names the row count so the sample size is visible', () => {
-    expect(specToCode(spec())).toMatch(/\/\/ 3 rows/);
+  it('keeps the data line clean — no row-count commentary', () => {
+    expect(specToCode(spec())).toContain('.data(data)\n');
+    expect(specToCode(spec())).not.toContain('rows');
   });
 
   it('emits aesthetics in ggplot2 order', () => {
@@ -126,13 +127,12 @@ describe('specToCode', () => {
     expect(code).not.toContain("size: 'size'");
   });
 
-  it('summarises a long array instead of dumping it', () => {
-    // Every Power BI chart carries the host palette; 32 hex strings would
-    // bury the lines the author actually chose.
+  it('spells a long array out in full — the code hides nothing', () => {
     const palette = Array.from({ length: 32 }, (_, i) => `#${String(i).padStart(6, '0')}`);
     const code = specToCode(spec({ theme: { colorPalette: palette } }));
-    expect(code).toContain('colorPalette: [/* 32 values */]');
-    expect(code).not.toContain('#000031');
+    expect(code).toContain("'#000000'");
+    expect(code).toContain("'#000031'"); // the last of all 32
+    expect(code).not.toContain('values */');
   });
 
   it('still spells out a short array', () => {
@@ -214,7 +214,7 @@ describe('the rendered overlay', () => {
     const panel = el.querySelector('.ggpbi-code-view')!;
     expect(panel).toBeTruthy();
     expect(panel.textContent).toContain(".geom('point')");
-    expect(panel.querySelector('button')?.textContent).toBe('Copy');
+    expect(panel.querySelector('button')?.getAttribute('aria-label')).toBe('Copy code');
   });
 
   it('colours the tokens', () => {
