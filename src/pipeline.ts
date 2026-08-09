@@ -17,6 +17,7 @@ import { createScale, inferScaleType, createSizeScale, type GgpbiScale, type Ban
 import { stats, DEFAULT_GEOM_STAT } from './stats';
 import { inferGeom } from './auto-geom';
 import { computePosition } from './position';
+import { continuousBandPx } from './geoms/util';
 import type { ResolvedTheme } from './theme';
 import { resolveTheme } from './theme';
 import { estimateLegendWidth, type LegendEntry } from './legend';
@@ -24,6 +25,7 @@ import { extendedBreaks, formatBreaksAs } from './breaks';
 import { describePlot, hasHiddenTransform, fieldLabelsFor, type LayerDescription } from './describe';
 import { shouldWarnAggregated, AGGREGATION_NOTE } from './row-identity';
 import { specToCode } from './codegen';
+import { specToR } from './r-codegen';
 
 // ---------------------------------------------------------------------------
 // Pipeline types
@@ -624,7 +626,8 @@ export function computeGeomPadding(
       case 'bar':
       case 'col':
       case 'histogram':
-      case 'boxplot': {
+      case 'boxplot':
+      case 'violin': {
         const isHoriz = ('orientation' in geom) ? geom.orientation === 'y' : false;
         const catAxis = isHoriz ? 'y' : 'x';
         const catType = catAxis === 'x' ? xType : yType;
@@ -637,17 +640,26 @@ export function computeGeomPadding(
           break;
         }
 
-        // Continuous scale: estimate half-bar-width
+        // Continuous scale: estimate half a mark width, the same way the
+        // geoms size themselves — from the smallest gap between distinct
+        // values (ggplot2's resolution()), scaled by the unpadded
+        // pixels-per-unit. Padding the domain only shrinks that ratio, so
+        // the estimate errs on the roomy side.
         const catSize = catAxis === 'x' ? innerWidth : innerHeight;
         const field = spec.aes[catAxis];
         if (!field) break;
-        const nCat = new Set(
-          (layerBindings[gi] ?? []).map(d => String(d[catAxis === 'x' ? 'x' : 'y']))
-        ).size || 1;
+        const rows = layerBindings[gi] ?? [];
+        const values = [...new Set(rows.map(d => Number(d[catAxis === 'x' ? 'x' : 'y'])))]
+          .filter(v => Number.isFinite(v));
+        const nCat = new Set(rows.map(d => String(d[catAxis === 'x' ? 'x' : 'y']))).size || 1;
 
         const widthFraction = geom.width ?? 0.9;
-        const multiplier = geom.type === 'boxplot' ? 0.6 : 0.8;
-        const halfBarWidth = (catSize / nCat) * multiplier * widthFraction / 2;
+        const minGapUnits = continuousBandPx(values, NaN);
+        const extent = values.length > 1 ? Math.max(...values) - Math.min(...values) : 0;
+        const multiplier = geom.type === 'boxplot' || geom.type === 'violin' ? 0.6 : 0.8;
+        const halfBarWidth = Number.isFinite(minGapUnits) && extent > 0
+          ? (minGapUnits / extent) * catSize * widthFraction / 2
+          : (catSize / nCat) * multiplier * widthFraction / 2;
 
         if (catAxis === 'x') xPad = Math.max(xPad, halfBarWidth);
         else yPad = Math.max(yPad, halfBarWidth);
@@ -1183,7 +1195,11 @@ export function buildPlot(
   // aesthetics point at __sum / __count, which is precisely what the code
   // below would compute for them.
   const codeText = spec.showCode
-    ? specToCode(preStatSpec, fieldLabelsFor(preStatSpec, spec.fieldLabels ?? {}))
+    ? spec.codeTextOverride
+      ?? (spec.codeSyntax === 'ggplot2' ? specToR : specToCode)(
+        preStatSpec,
+        fieldLabelsFor(preStatSpec, spec.fieldLabels ?? {}),
+      )
     : undefined;
   const layout = computeLayout(spec, theme, legend.width, externalMargin, !!subtitleText);
 

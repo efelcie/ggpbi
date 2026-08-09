@@ -442,7 +442,22 @@ export function renderWithState(
   // 7. Debug view: the code behind the chart, overlaid so the plot keeps
   // its size. Last, so it sits above the marks.
   if (built.codeText) {
-    renderCodeView(container, built.codeText, built.theme);
+    const dock = spec.codeEdit?.dockHost;
+    if (dock) {
+      // Advanced edit: the editor is a docked pane beside the chart, not
+      // an overlay on top of it.
+      dock.replaceChildren();
+      renderCodeView(dock, built.codeText, built.theme, {
+        ...(spec.codeEdit ?? {}),
+        syntax: spec.codeSyntax ?? 'ggpbi',
+        docked: true,
+      });
+    } else {
+      renderCodeView(container, built.codeText, built.theme, {
+        ...(spec.codeEdit ?? {}),
+        syntax: spec.codeSyntax ?? 'ggpbi',
+      });
+    }
   }
 
   return { svg: svg.node()!, tooltip, selection };

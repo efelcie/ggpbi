@@ -27,7 +27,7 @@ export interface CodeToken {
 export type CodeFieldLabels = Partial<Record<keyof AesMapping | 'facetCol' | 'facetRow', string>>;
 
 /** Aesthetics worth naming, in the order ggplot2 users write them. */
-const AES_ORDER: Array<keyof AesMapping> = [
+export const AES_ORDER: Array<keyof AesMapping> = [
   'x', 'y', 'color', 'fill', 'size', 'shape', 'alpha', 'group',
   'label', 'facetCol', 'facetRow', 'xend', 'yend', 'xmin', 'xmax', 'ymin', 'ymax',
 ];
@@ -53,8 +53,12 @@ const GEOM_DEFAULTS: Record<string, unknown> = {
 /** Keys that never belong in generated code — internals, not options. */
 const SKIP_GEOM_KEYS = new Set(['type', 'aes', 'stat']);
 
-/** Beyond this many entries an array is summarised rather than spelled out. */
-const LITERAL_ARRAY_LIMIT = 6;
+/**
+ * Theme values the host supplies — the report palette, contrast state.
+ * Shown in full (the code hides nothing) but emitted on their own lines,
+ * because the editor greys them: display, not configuration.
+ */
+export const HOST_THEME_KEYS = new Set(['colorPalette', 'isHighContrast']);
 
 const q = (s: string): string => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
@@ -63,13 +67,9 @@ function literal(value: unknown): string {
   if (typeof value === 'number') return String(Math.round(value * 1000) / 1000);
   if (typeof value === 'boolean') return String(value);
   if (value instanceof Date) return `new Date(${q(value.toISOString().slice(0, 10))})`;
-  if (Array.isArray(value)) {
-    // A long array is almost always the host's colour palette, which the
-    // report theme supplies rather than the author. Spelling out 32 hex
-    // strings buries the lines that were actually chosen.
-    if (value.length > LITERAL_ARRAY_LIMIT) return `[/* ${value.length} values */]`;
-    return `[${value.map(literal).join(', ')}]`;
-  }
+  // Spelled out in full, palettes included — the code never hides
+  // anything behind a summary; whole truth beats short truth.
+  if (Array.isArray(value)) return `[${value.map(literal).join(', ')}]`;
   if (value && typeof value === 'object') return objectLiteral(value as Record<string, unknown>);
   return String(value);
 }
@@ -131,9 +131,7 @@ function scaleOptions(cfg: ScaleType | AxisScaleConfig | undefined): string {
  */
 export function specToCode(spec: PlotSpec, labels: CodeFieldLabels = {}): string {
   const lines: string[] = ['ggpbi()'];
-
-  const rowCount = spec.data?.length ?? 0;
-  lines.push(`  .data(data)${rowCount ? `                       // ${rowCount.toLocaleString()} rows` : ''}`);
+  lines.push('  .data(data)');
 
   const aesParts: string[] = [];
   for (const key of AES_ORDER) {
@@ -167,8 +165,19 @@ export function specToCode(spec: PlotSpec, labels: CodeFieldLabels = {}): string
       : '  .highlight({ filter: d => /* … */ })');
   }
 
-  const theme = objectLiteral((spec.theme ?? {}) as Record<string, unknown>);
-  if (theme) lines.push(`  .theme(${theme})`);
+  // Host-owned theme values (the report palette, high-contrast state) get
+  // their own lines: the editor greys per line, and these are display,
+  // not configuration — shown whole, but not yours to change.
+  const themeEntries = Object.entries((spec.theme ?? {}) as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '' && typeof v !== 'function');
+  const hostEntries = themeEntries.filter(([k]) => HOST_THEME_KEYS.has(k));
+  const ownEntries = themeEntries.filter(([k]) => !HOST_THEME_KEYS.has(k));
+  if (hostEntries.length > 0) {
+    const inner = [...hostEntries, ...ownEntries].map(([k, v]) => `    ${k}: ${literal(v)}`);
+    lines.push(`  .theme({\n${inner.join(',\n')},\n  })`);
+  } else if (ownEntries.length > 0) {
+    lines.push(`  .theme(${objectLiteral(Object.fromEntries(ownEntries))})`);
+  }
 
   if (typeof spec.subtitle === 'string' && spec.subtitle !== 'auto') {
     lines.push(`  .subtitle(${q(spec.subtitle)})`);

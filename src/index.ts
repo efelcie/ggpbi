@@ -60,7 +60,17 @@ export { Selection } from './selection';
 export { ThemeConfig, ResolvedTheme, resolveTheme, axisLabelPriority, themeGrey, themeMinimal, themeDark, PBI_DEFAULT_PALETTE } from './theme';
 export { renderLegend, estimateLegendWidth, type LegendEntry } from './legend';
 export { specToCode, highlight, type CodeToken, type TokenKind } from './codegen';
-export { renderCodeView } from './code-view';
+export { renderCodeView, type CodeViewOptions } from './code-view';
+export { parseCode, applyCodeEdit, ELIDED, FUNC, type CodePatch, type ParseResult } from './code-parse';
+export { specToR, highlightR } from './r-codegen';
+export { parseR } from './r-parse';
+export {
+  ggpbirText, parseGgpbir, ggpbirInertLines, ggpbirReadOnlyMatches,
+  highlightJson, encodeProperty, decodeProperty,
+  type GgpbirContext, type GgpbirParseResult, type WellProjection,
+} from './ggpbir-codegen';
+export { computePaneWriteback, type WritebackResult, type PersistInstance } from './pane-writeback';
+export { createCmEditor, type CmEditor, type CmEditorOptions } from './cm-editor';
 export { inferGeom, inferScaleLevel, type ScaleLevel } from './auto-geom';
 export { buildPlot, resolveLayerStat, type BuiltPlot, type BuiltLayer, type ScaleSet, type PlotLayout, type LegendInfo } from './pipeline';
 export { stats, statCount, statBin, statSmooth, statDensity, DEFAULT_GEOM_STAT, STAT_COUNT_FIELD, STAT_BIN_COUNT, STAT_BIN_DENSITY, STAT_BIN_NCOUNT, STAT_BIN_NDENSITY, STAT_BIN_WIDTH, STAT_BIN_X, STAT_BIN_XMIN, STAT_BIN_XMAX, STAT_SMOOTH_X, STAT_SMOOTH_Y, STAT_SMOOTH_YMIN, STAT_SMOOTH_YMAX, STAT_SMOOTH_SE, STAT_DENSITY_X, STAT_DENSITY_Y, type StatFn, type StatResult, type StatBinParams, type StatSmoothParams, type StatDensityParams } from './stats';

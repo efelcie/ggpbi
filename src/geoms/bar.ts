@@ -3,7 +3,7 @@ import { BarGeomConfig, PositionType } from '../types';
 import { BoundPoint } from '../bind-data';
 import type { PositionedPoint } from '../position';
 import type { RectNode, NodeStyle } from '../scene-types';
-import { linetypeToDasharray, GEOM_DEFAULT_COLOR, filterNA } from './util';
+import { linetypeToDasharray, GEOM_DEFAULT_COLOR, filterNA, continuousBandPx } from './util';
 
 
 // ---------------------------------------------------------------------------
@@ -86,13 +86,17 @@ export function barsToScene(
   const valScale = isHorizontal ? xScale : yScale;
   const isBand = typeof catScale.bandwidth === 'function';
 
-  // Bar thickness
+  // Bar thickness. On a continuous axis the width follows ggplot2's
+  // resolution(): the smallest gap between adjacent distinct positions,
+  // so bars at irregular x values can touch but never overlap.
   const catGroups = d3.group(barPoints, d => String(isHorizontal ? d.y : d.x));
   const nCategories = catGroups.size || barPoints.length;
+  const catPositions = [...catGroups.values()]
+    .map(g => Number(catScale(isHorizontal ? g[0].y : g[0].x)));
   const baseBandWidth = isBand
     ? catScale.bandwidth() * widthFraction
     : innerWidth
-      ? Math.max(1, (innerWidth / nCategories) * 0.8 * widthFraction)
+      ? Math.max(1, continuousBandPx(catPositions, (innerWidth / nCategories) * 0.8) * widthFraction)
       : 20;
 
   // Justification

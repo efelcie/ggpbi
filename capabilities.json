@@ -2148,6 +2148,33 @@
             "bool": true
           }
         },
+        "vimMode": {
+          "displayName": "Vim mode",
+          "description": "Modal (vim-style) editing in the code overlay's editor. Ctrl+M in the editor overrides this for the session. A report theme can set it report-wide.",
+          "type": {
+            "bool": true
+          }
+        },
+        "codeSyntax": {
+          "displayName": "Code syntax",
+          "description": "Which language the code overlay speaks: the fluent ggpbi chain, or ggplot2 (R). Both are editable and both apply to the chart.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "ggpbi",
+                "displayName": "ggpbi"
+              },
+              {
+                "value": "ggplot2",
+                "displayName": "ggplot2 (R)"
+              },
+              {
+                "value": "ggpbir",
+                "displayName": "ggpbir (report JSON)"
+              }
+            ]
+          }
+        },
         "currency": {
           "displayName": "Currency code",
           "description": "ISO 4217 code used when an axis label format is set to Currency (EUR, USD, CHF). Symbol and placement follow the report locale.",
@@ -2347,5 +2374,6 @@
   "supportsMultiVisualSelection": true,
   "supportsKeyboardFocus": true,
   "supportsLandingPage": true,
+  "advancedEditModeSupport": 2,
   "privileges": []
 }

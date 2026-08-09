@@ -720,6 +720,44 @@ export interface PlotOptions {
    * resize it.
    */
   showCode?: boolean;
+  /**
+   * Which language the debug view speaks: the fluent ggpbi chain
+   * (default), ggplot2 (R), or ggpbir — the visual's real report-file
+   * JSON. All three are editable.
+   */
+  codeSyntax?: 'ggpbi' | 'ggplot2' | 'ggpbir';
+  /**
+   * Pre-rendered text for the debug view, overriding the generated code.
+   * The ggpbir dialect needs host context (wells, pane state) that a
+   * PlotSpec does not carry, so the visual renders it and hands it over.
+   */
+  codeTextOverride?: string;
+  /**
+   * Host hooks for editing the code shown by the debug view (Deneb-style).
+   * Like `tooltipService`, these are live callbacks, not serializable
+   * state: `onApply` receives the edited text and returns an error message
+   * or null, after which the host re-renders. Applied edits are durable —
+   * there is no reset; deletions write defaults back to the pane.
+   */
+  codeEdit?: {
+    onApply?: (code: string) => string | null;
+    edited?: boolean;
+    /** Default for the editor's modal (vim) layer; Ctrl+M overrides per session. */
+    vimDefault?: boolean;
+    /** The header's ✕ — the host persists showCode off. */
+    onClose?: () => void;
+    /**
+     * Dock the editor into this element instead of overlaying the chart —
+     * the advanced-edit split view: editor left, chart right.
+     */
+    dockHost?: HTMLElement;
+    /** Display names of the bound well fields, for autocomplete. */
+    fields?: string[];
+    /** The header's language switch — the host persists the next dialect. */
+    onSyntaxChange?: (syntax: 'ggpbi' | 'ggplot2' | 'ggpbir') => void;
+    /** The header's vim switch / Ctrl+M — the host persists the state. */
+    onVimChange?: (on: boolean) => void;
+  };
   /** Display names per aesthetic for the generated subtitle (Power BI field names). */
   fieldLabels?: Partial<Record<'x' | 'y' | 'color' | 'size' | 'facetCol' | 'facetRow', string>>;
   showLegend?: boolean;

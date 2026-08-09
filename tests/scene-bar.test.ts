@@ -323,4 +323,63 @@ describe('barsToScene (pure, no JSDOM)', () => {
       expect(barB.width).toBeGreaterThan(barA.width);
     });
   });
+
+  describe('continuous x axis', () => {
+    // ggplot2 sizes bars on a continuous axis by resolution(x) — the
+    // smallest gap between distinct values. Dividing the panel evenly
+    // assumed regular spacing and made irregularly spaced bars overlap.
+    const irregular = [
+      { wt: 1.5, mpg: 30 },
+      { wt: 1.6, mpg: 28 },   // 0.1 apart — the resolution
+      { wt: 3.0, mpg: 20 },
+      { wt: 5.4, mpg: 10 },
+    ];
+
+    it('bars at irregular positions never overlap', () => {
+      const points = bindBarData(irregular, 'wt', 'mpg');
+      const xScale = linearScale([1, 6], [0, 500]);
+      const yScale = linearScale([0, 30], [200, 0]);
+
+      const nodes = barsToScene(points, xScale, yScale, { type: 'bar', position: 'identity' }, undefined, 500);
+
+      const spans = nodes.map(n => [n.x, n.x + n.width]).sort((a, b) => a[0] - b[0]);
+      for (let i = 1; i < spans.length; i++) {
+        expect(spans[i][0], `bar ${i} starts before bar ${i - 1} ends`)
+          .toBeGreaterThanOrEqual(spans[i - 1][1]);
+      }
+    });
+
+    it('bar width follows the smallest gap, not the panel share', () => {
+      const points = bindBarData(irregular, 'wt', 'mpg');
+      const xScale = linearScale([1, 6], [0, 500]);
+      const yScale = linearScale([0, 30], [200, 0]);
+
+      const nodes = barsToScene(points, xScale, yScale, { type: 'bar', position: 'identity' }, undefined, 500);
+
+      // Smallest gap: 0.1 wt = 10px at 100px per wt; ggplot2 default 0.9.
+      for (const n of nodes) expect(n.width).toBeCloseTo(10 * 0.9, 5);
+    });
+
+    it('bars stay centred on their value', () => {
+      const points = bindBarData(irregular, 'wt', 'mpg');
+      const xScale = linearScale([1, 6], [0, 500]);
+      const yScale = linearScale([0, 30], [200, 0]);
+
+      const nodes = barsToScene(points, xScale, yScale, { type: 'bar', position: 'identity' }, undefined, 500);
+
+      const first = nodes.find(n => n.data?.x === 1.5)!;
+      expect(first.x + first.width / 2).toBeCloseTo(xScale(1.5), 5);
+    });
+
+    it('a single distinct value falls back to the panel share', () => {
+      const points = bindBarData([{ wt: 3, mpg: 20 }], 'wt', 'mpg');
+      const xScale = linearScale([1, 6], [0, 500]);
+      const yScale = linearScale([0, 30], [200, 0]);
+
+      const nodes = barsToScene(points, xScale, yScale, { type: 'bar', position: 'identity' }, undefined, 500);
+
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0].width).toBeCloseTo(500 * 0.8 * 0.9, 5);
+    });
+  });
 });

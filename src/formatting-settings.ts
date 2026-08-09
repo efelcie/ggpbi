@@ -476,6 +476,23 @@ class ThemeCard extends formattingSettings.SimpleCard {
     value: false,
   });
 
+  // Modal editing in the code overlay's editor. A default, not a lock:
+  // Ctrl+M in the editor overrides it for the session, and a report theme
+  // can set it for every ggpbi visual in the report.
+  vimMode = new formattingSettings.ToggleSwitch({
+    name: 'vimMode',
+    displayName: 'Vim mode',
+    value: false,
+  });
+
+  // Which language the code overlay speaks. Both dialects are editable;
+  // ggplot2 is the one the grammar was learned from.
+  codeSyntax = new formattingSettings.AutoDropdown({
+    name: 'codeSyntax',
+    displayName: 'Code syntax',
+    value: 'ggpbi',
+  });
+
   // ISO 4217 rather than a symbol: Intl places the symbol and spacing
   // the way the report locale expects, which "€" alone cannot express.
   currency = new formattingSettings.TextInput({
@@ -531,6 +548,8 @@ class ThemeCard extends formattingSettings.SimpleCard {
     this.subtitle,
     this.warnAggregated,
     this.showCode,
+    this.vimMode,
+    this.codeSyntax,
     this.currency,
     this.preset,
     this.panelFill,

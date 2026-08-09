@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import { BoxplotGeomConfig } from '../types';
 import { BoundPoint } from '../bind-data';
 import type { SceneNode, GroupNode } from '../scene-types';
-import { linetypeToDasharray, getShapeInfo } from './util';
+import { linetypeToDasharray, getShapeInfo, continuousBandPx } from './util';
 import { computeBoxplotStats } from '../stats';
 import type { BoxplotStats } from '../stats';
 
@@ -139,10 +139,15 @@ export function boxplotToScene(
   const byX = d3.group(stats, d => String(d.x));
   const nCategories = byX.size || stats.length;
 
+  // Continuous axis: box width from the smallest gap between distinct
+  // positions (ggplot2's resolution()), so boxes never overlap.
   const baseWidth = isBand
     ? xScale.bandwidth() * widthFraction
     : innerWidth
-      ? Math.max(6, (innerWidth / nCategories) * 0.6 * widthFraction)
+      ? Math.max(6, continuousBandPx(
+          [...byX.values()].map(g => Number(xScale(g[0].x))),
+          (innerWidth / nCategories) * 0.6,
+        ) * widthFraction)
       : 24;
 
   const maxN = varwidth ? Math.max(...stats.map(s => s.n)) : 0;

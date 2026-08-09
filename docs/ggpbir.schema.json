@@ -5665,6 +5665,75 @@
                     }
                   }
                 },
+                "vimMode": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "codeSyntax": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'ggpbi'",
+                                "'ggplot2'",
+                                "'ggpbir'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "currency": {
                   "type": "object",
                   "additionalProperties": false,

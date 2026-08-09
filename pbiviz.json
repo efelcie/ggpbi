@@ -4,7 +4,7 @@
     "displayName": "ggpbi - Grammar of Graphics",
     "guid": "ggpbiGrammarOfGraphics",
     "visualClassName": "Visual",
-    "version": "0.4.0.0",
+    "version": "0.5.0.0",
     "description": "A layered graphics system for Power BI, inspired by ggplot2",
     "supportUrl": "https://github.com/efelcie/ggpbi",
     "gitHubUrl": "https://github.com/efelcie/ggpbi"

@@ -1,6 +1,6 @@
 {
   "name": "ggpbi",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Grammar of Graphics for Power BI",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,6 +50,11 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.8",
+    "@replit/codemirror-vim": "^6.4.0",
     "d3": "^7.8.0",
     "powerbi-visuals-api": "~5.1.0",
     "powerbi-visuals-utils-formattingmodel": "^6.0.0"

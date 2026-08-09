@@ -179,3 +179,24 @@ export function getShapeInfo(shape?: ShapeType): ShapeInfo {
 export function shapeToSymbol(shape?: ShapeType): d3.SymbolType {
   return getShapeInfo(shape).symbol;
 }
+
+/**
+ * Mark thickness on a continuous axis, ggplot2-style.
+ *
+ * ggplot2 sizes bars and boxes by `resolution(x)` — the smallest gap
+ * between adjacent distinct positions — so marks can touch but never
+ * overlap. Dividing the panel evenly (`innerWidth / nCategories`) assumes
+ * regular spacing; with irregular values (mtcars weights, say) the marks
+ * are wider than their nearest neighbour is away, and overlap.
+ *
+ * @param positions scaled centres of the distinct category values, in px
+ * @param evenShare fallback when fewer than two finite positions exist
+ * @returns the smallest adjacent gap in px, or `evenShare`
+ */
+export function continuousBandPx(positions: number[], evenShare: number): number {
+  const distinct = [...new Set(positions.filter(p => Number.isFinite(p)))].sort((a, b) => a - b);
+  if (distinct.length < 2) return evenShare;
+  let min = Infinity;
+  for (let i = 1; i < distinct.length; i++) min = Math.min(min, distinct[i] - distinct[i - 1]);
+  return min;
+}

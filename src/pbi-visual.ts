@@ -21,12 +21,17 @@ type VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import { FormattingSettingsService } from 'powerbi-visuals-utils-formattingmodel';
 import { GgpbiFormattingSettings } from './formatting-settings';
 import { renderWithState } from './render';
+import { parseCode, applyCodeEdit } from './code-parse';
+import { parseR } from './r-parse';
+import { computePaneWriteback } from './pane-writeback';
+import { specToCode } from './codegen';
+import { ggpbirText, parseGgpbir, ggpbirReadOnlyMatches, type GgpbirContext } from './ggpbir-codegen';
 import { fromDataView, DEFAULT_ROLE_MAPPING, NUMBERED_ROLES, resolveLabelBinding, restoreSharedFieldAliases, resolveSoloMeasureMode, resolveReferencePositions, isDataTruncated } from './powerbi';
 import { inferGeom } from './auto-geom';
 import { themeDark, themeMinimal, GREY_DEFAULTS } from './theme';
 import { explainError } from './friendly-errors';
 import type { Selection } from './selection';
-import type { GeomType, GeomConfig, Layer, ScaleType, PositionType, LinetypeType, ShapeType, DataPoint } from './types';
+import type { GeomType, GeomConfig, Layer, ScaleType, PositionType, LinetypeType, ShapeType, DataPoint, PlotSpec } from './types';
 
 /** Build landing page DOM — shown when no data fields are assigned. */
 function createLandingPage(): DocumentFragment {
@@ -136,6 +141,15 @@ export class Visual implements IVisual {
   /** Selection instance + data of the most recent render (for restore/bookmarks). */
   private lastSelection?: Selection;
   private lastData: DataPoint[] = [];
+  /**
+   * The applied edit, stored as the parsed patch — dialect-neutral STATE,
+   * not text. Both parsers emit this one shape, so every language renders
+   * the same applied state and switching languages is pure re-projection:
+   * nothing resets. The expressible parts also live in the pane (apply
+   * writes them back); this patch covers the rest and the echo gap.
+   */
+  private appliedPatch?: import('./code-parse').CodePatch;
+  private lastUpdateOptions?: VisualUpdateOptions;
 
   constructor(options: VisualConstructorOptions) {
     this.container = options.element;
@@ -159,6 +173,57 @@ export class Visual implements IVisual {
     });
   }
 
+  /** Re-run the last host update — after the code editor applies or resets. */
+  private rerender(): void {
+    if (this.lastUpdateOptions) this.update(this.lastUpdateOptions);
+  }
+
+  /**
+   * The current Format Pane state as plain object → property → value —
+   * the ggpbir dialect's editable half, and the vocabulary its apply
+   * step validates against.
+   */
+  private settingsToObjects(
+    model: GgpbiFormattingSettings = this.formattingSettings,
+  ): Record<string, Record<string, unknown>> {
+    const plain = (v: unknown): unknown => {
+      if (v !== null && typeof v === 'object') {
+        const withValue = v as { value?: unknown };
+        if (withValue.value !== undefined) return plain(withValue.value);
+      }
+      return v;
+    };
+    const objects: Record<string, Record<string, unknown>> = {};
+    for (const card of model.cards) {
+      const properties: Record<string, unknown> = {};
+      const slices = [
+        ...((card as { slices?: unknown[] }).slices ?? []),
+        ...((card as { groups?: Array<{ slices?: unknown[] }> }).groups ?? [])
+          .flatMap(g => g.slices ?? []),
+      ] as Array<{ name?: string; value?: unknown }>;
+      for (const slice of slices) {
+        if (!slice?.name) continue;
+        const value = plain(slice.value);
+        if (value === undefined || value === null || value === '') continue;
+        properties[slice.name] = value;
+      }
+      const name = (card as { name?: string }).name;
+      if (name && Object.keys(properties).length > 0) objects[name] = properties;
+    }
+    return objects;
+  }
+
+  /** Persist one theme property and re-render with it applied locally. */
+  private persistThemeProperty(property: string, value: unknown): void {
+    try {
+      this.host.persistProperties({
+        merge: [{ objectName: 'theme', selector: null, properties: { [property]: value } }] as any,
+      });
+    } catch {
+      // Hosts without persistence still get the local session flip.
+    }
+  }
+
   /** Map SelectionManager ids back to data rows and sync the visual highlight. */
   private applyManagerSelection(ids: any[]): void {
     if (!this.lastSelection) return;
@@ -180,6 +245,9 @@ export class Visual implements IVisual {
   public update(options: VisualUpdateOptions): void {
     // Signal render start — required for PDF/PPT export
     this.events.renderingStarted(options);
+    // Kept so the code editor can re-run the exact same update after an
+    // Apply or Reset — the host only calls update() on its own triggers.
+    this.lastUpdateOptions = options;
 
     try {
       // No categorical data? Always show landing page.
@@ -854,9 +922,19 @@ export class Visual implements IVisual {
       // Host palette ALWAYS overrides — PBI-native colors have priority
       if (hostPalette.length > 0) themeConfig.colorPalette = hostPalette;
 
-      const rendered = renderWithState(
-        this.container,
-        {
+      // Field wells carry internal keys (yRaw1, y1, x); the description and
+      // the generated code must name what the user sees in the wells — and
+      // the code editor maps those names back on apply.
+      const fieldLabels = {
+        ...(xLabel && { x: xLabel }),
+        ...(yLabel && { y: yLabel }),
+        ...(seriesName && { color: seriesName }),
+        ...(sizeDisplayName && { size: sizeDisplayName }),
+        ...(labelFieldName && { label: labelFieldName }),
+        ...(facetFieldName && { facetCol: facetFieldName }),
+      };
+
+      const liveSpec: PlotSpec = {
           data,
           aes: aesMapping,
           layers,
@@ -864,22 +942,17 @@ export class Visual implements IVisual {
           ...(isTruncated && { truncation: { shown: data.length } }),
           ...(s.theme.warnAggregated.value && { warnAggregated: true }),
           ...(s.theme.showCode.value && { showCode: true }),
+          ...((): { codeSyntax?: 'ggplot2' | 'ggpbir' } => {
+            const syntax = extractEnum(s.theme.codeSyntax.value);
+            return syntax === 'ggplot2' || syntax === 'ggpbir' ? { codeSyntax: syntax } : {};
+          })(),
           // Axis numbers and month names follow the report language, not
           // the JavaScript default: "1.234,5" and "Mär" in a German report.
           format: {
             ...(this.host.locale && { locale: this.host.locale }),
             ...(currencyCode && { currency: currencyCode }),
           },
-          // Field wells carry internal keys (yRaw1, y1, x); the description
-          // must name what the user sees in the wells.
-          fieldLabels: {
-            ...(xLabel && { x: xLabel }),
-            ...(yLabel && { y: yLabel }),
-            ...(seriesName && { color: seriesName }),
-            ...(sizeDisplayName && { size: sizeDisplayName }),
-            ...(labelFieldName && { label: labelFieldName }),
-            ...(facetFieldName && { facetCol: facetFieldName }),
-          },
+          fieldLabels,
           ...(scaleX || scaleY || labelFormatX || labelFormatY || dateFormatX || dateFormatY ? {
             scales: {
               ...((scaleX || labelFormatX || dateFormatX) && {
@@ -929,8 +1002,197 @@ export class Visual implements IVisual {
           }),
           width: options.viewport.width,
           height: options.viewport.height,
-        },
-      );
+      };
+
+      // An edit applied through the debug view rides on top of the live
+      // spec: data, services and viewport stay live, the declarative story
+      // comes from the edited code. Session-only — nothing is persisted.
+      // "Edit" in the visual's options menu (advanced edit mode) opens the
+      // editor in focus mode — the same door Deneb uses. While the host
+      // says editMode Advanced, the overlay shows regardless of the pane
+      // toggle; leaving focus mode hands control back to the pane.
+      const advancedEdit = (options as { editMode?: number }).editMode === 1;
+      if (advancedEdit && !liveSpec.showCode) liveSpec.showCode = true;
+
+      // Both dialects funnel into the same CodePatch; which parser reads
+      // the editor's text follows the pane's syntax switch.
+      const parseDialect = liveSpec.codeSyntax === 'ggplot2' ? parseR : parseCode;
+
+      // The ggpbir dialect shows the report file itself: wells and pane
+      // state, rendered here because a PlotSpec carries neither. Its
+      // apply path is pure persistence — no overlay, no spec merge.
+      const isGgpbir = liveSpec.codeSyntax === 'ggpbir';
+      let ggpbirCtx: GgpbirContext | undefined;
+      if (isGgpbir && liveSpec.showCode) {
+        
+        const wells: GgpbirContext['wells'] = {};
+        for (const column of dataView.metadata.columns ?? []) {
+          for (const role of Object.keys(column.roles ?? {})) {
+            (wells[role] ??= []).push({
+              displayName: column.displayName,
+              queryRef: column.queryName,
+            });
+          }
+        }
+        ggpbirCtx = {
+          visualType: 'ggpbiGrammarOfGraphics',
+          wells,
+          objects: this.settingsToObjects(),
+        };
+        liveSpec.codeTextOverride = ggpbirText(ggpbirCtx);
+      }
+
+      let spec = liveSpec;
+      if (this.appliedPatch !== undefined) {
+        const merged = applyCodeEdit(liveSpec, this.appliedPatch, fieldLabels);
+        // The pane may have caught up with the edit (apply writes the
+        // expressible parts back as properties). Once the pane-built
+        // spec says the same thing, the overlay has nothing left to
+        // add and dissolves — editor and pane are one state again.
+        if (specToCode(merged, fieldLabels) === specToCode(liveSpec, fieldLabels)) {
+          this.appliedPatch = undefined;
+        } else {
+          spec = merged;
+          spec.showCode = liveSpec.showCode; // the toggle stays the pane's call
+        }
+      }
+      if (spec.showCode) {
+        const applyChartDialect = (text: string): string | null => {
+          // `=== false` rather than truthiness: the visual's tsconfig has
+          // strict off, and only literal comparison narrows the union there.
+          const parsed = parseDialect(text);
+          if (parsed.ok === false) return `Line ${parsed.line}: ${parsed.error}`;
+          this.appliedPatch = parsed.patch;
+          // The pane is the durable home: everything it can express is
+          // persisted as properties. The overlay covers the rest (and
+          // the gap until the host echoes the new values back).
+          const merged = applyCodeEdit(liveSpec, parsed.patch, fieldLabels);
+          // A pristine settings model supplies the defaults deleted lines
+          // revert to — deletion is a write like any other, so nothing
+          // snaps back when the overlay closes.
+          const paneDefaults = this.settingsToObjects(new GgpbiFormattingSettings());
+          const writeback = computePaneWriteback(parsed.patch, liveSpec, merged, paneDefaults);
+          if (writeback.instances.length > 0) {
+            try {
+              this.host.persistProperties({ merge: writeback.instances as any });
+            } catch {
+              // A host without persistence (tests, some embeds) still
+              // gets the session overlay.
+            }
+          }
+          this.rerender();
+          return null;
+        };
+
+        // ggpbir edits ARE pane state: validate, diff, persist. The chart
+        // follows when the host echoes the new values back.
+        const applyGgpbir = (text: string): string | null => {
+          const ctx = ggpbirCtx!;
+          const parsed = parseGgpbir(text);
+          if (parsed.ok === false) return `Line ${parsed.line}: ${parsed.error}`;
+          if (!ggpbirReadOnlyMatches(parsed.raw, ctx)) {
+            return 'The greyed sections (visualType, query) are read-only — fields are bound in the wells.';
+          }
+          const known = new Map<string, Set<string>>();
+          for (const card of this.formattingSettings.cards) {
+            const cardName = (card as { name?: string }).name;
+            if (!cardName) continue;
+            const slices = [
+              ...((card as { slices?: unknown[] }).slices ?? []),
+              ...((card as { groups?: Array<{ slices?: unknown[] }> }).groups ?? [])
+                .flatMap(g => g.slices ?? []),
+            ] as Array<{ name?: string }>;
+            known.set(cardName, new Set(slices.map(sl => sl.name).filter(Boolean) as string[]));
+          }
+          const instances: Array<{ objectName: string; selector: null; properties: Record<string, unknown> }> = [];
+          for (const [objectName, properties] of Object.entries(parsed.objects)) {
+            const vocabulary = known.get(objectName);
+            if (!vocabulary) return `unknown object "${objectName}"`;
+            const changed: Record<string, unknown> = {};
+            for (const [prop, value] of Object.entries(properties)) {
+              if (!vocabulary.has(prop)) return `unknown property "${objectName}.${prop}"`;
+              if (ctx.objects[objectName]?.[prop] === value) continue;
+              changed[prop] =
+                typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value)
+                  ? { solid: { color: value } }
+                  : value;
+            }
+            if (Object.keys(changed).length > 0) {
+              instances.push({ objectName, selector: null, properties: changed });
+            }
+          }
+          if (instances.length > 0) {
+            try {
+              this.host.persistProperties({ merge: instances as any });
+            } catch {
+              return 'this host cannot persist properties — ggpbir edits need Power BI';
+            }
+          }
+          this.rerender();
+          return null;
+        };
+
+        // The bound well fields, for autocomplete: only what exists can
+        // be named in aes() — the suggestions teach the well boundary.
+        const boundFields = [...new Set(
+          (dataView.metadata.columns ?? []).map(column => column.displayName),
+        )];
+
+        spec.codeEdit = {
+          edited: this.appliedPatch !== undefined,
+          vimDefault: s.theme.vimMode.value === true,
+          fields: boundFields,
+          onApply: isGgpbir ? applyGgpbir : applyChartDialect,
+          // The header's ✕ — the overlay is a pane toggle, so closing it
+          // is a pane write like any other. In advanced edit mode there is
+          // no ✕: the editor IS the focus view; leave it via the host.
+          ...(advancedEdit ? {} : {
+            // Closing hides the editor, nothing more — what was applied
+            // stays applied. There is no reset after apply.
+            onClose: () => {
+              this.persistThemeProperty('showCode', false);
+              (s.theme.showCode as { value: boolean }).value = false;
+              this.rerender();
+            },
+          }),
+          onSyntaxChange: (syntax) => {
+            // Purely a change of representation: the applied state stays,
+            // the next render projects it into the chosen language.
+            this.persistThemeProperty('codeSyntax', syntax);
+            (s.theme.codeSyntax as { value: unknown }).value = syntax;
+            this.rerender();
+          },
+          onVimChange: (on) => {
+            this.persistThemeProperty('vimMode', on);
+            (s.theme.vimMode as { value: boolean }).value = on;
+          },
+        };
+      }
+
+      // Advanced edit renders as a split view, the Deneb way: the editor
+      // docked left, the chart in the remaining width right. In the
+      // report the editor stays the light overlay it always was.
+      let renderTarget: HTMLElement = this.container;
+      if (advancedEdit && spec.showCode && spec.codeEdit) {
+        const viewportWidth = options.viewport.width;
+        // An even split: editor and chart share the window half and half.
+        const dockWidth = Math.round(viewportWidth / 2);
+        this.container.replaceChildren();
+        const split = document.createElement('div');
+        split.style.cssText = 'display:flex;align-items:stretch;width:100%;height:100%;overflow:hidden';
+        const dockHost = document.createElement('div');
+        dockHost.style.cssText = `flex:0 0 ${dockWidth}px;height:100%;overflow:hidden;display:flex`;
+        const chartHost = document.createElement('div');
+        chartHost.style.cssText = 'flex:1 1 auto;height:100%;position:relative;overflow:hidden';
+        split.appendChild(dockHost);
+        split.appendChild(chartHost);
+        this.container.appendChild(split);
+        spec.codeEdit.dockHost = dockHost;
+        spec.width = Math.max(120, viewportWidth - dockWidth);
+        renderTarget = chartHost;
+      }
+
+      const rendered = renderWithState(renderTarget, spec);
 
       // Re-apply an existing cross-filter selection after the re-render —
       // otherwise resize/format changes drop the highlight while the report
