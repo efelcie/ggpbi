@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/logo.svg" alt="ggpbi — Grammar of Graphics for Power BI" width="520">
+  <img src="assets/social-preview.png" alt="ggpbi — Grammar of Graphics for Power BI" width="640">
 </p>
 
 # ggpbi — Grammar of Graphics for Power BI
