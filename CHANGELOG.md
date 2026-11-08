@@ -1,5 +1,29 @@
 # ggpbi Development Log
 
+## 2026-11-08 - v0.7.0
+
+- ggpbi reproduces native Power BI charts exactly, each piece with its
+  ggplot2 name: the y axis on the right (`position = "right"`), fixed
+  display units for the labels (`labelUnit`: `0M`, `500M`, `1,500M` —
+  `label_number(scale = 1e-6, suffix = "M")`), tick label colours, fixed
+  date spacing (`dateBreaks: "6 months"`, ggplot2 `date_breaks`).
+- Theme switches for vertical and horizontal grid lines, minor grid lines
+  and tick marks, and a font family (`base_family`) that defaults to
+  Power BI's Segoe UI, so a ggpbi chart reads like the report around it.
+- Facets without strip labels (`strips`) and with axes per panel row
+  (`rowAxes`, e.g. `xy,none`): the month labels between a line panel and
+  a flat column panel without scale — the two-part chart of a stock app.
+  A right-hand axis works in facets too.
+- An area layer with a size draws its upper edge as a line (ggplot2
+  `geom_area(colour =, linewidth =)`), alpha thinning only the fill: a
+  shaded LTM line is one layer.
+- A blank axis title (a single space) removes the title and its room,
+  like `labs(x = NULL)`; a facet whose last row shows no x axis leaves no
+  room for one under the chart.
+- Dash patterns grow with the line width, so a thick dashed line in a 3×
+  layout stays dashed.
+- New gallery sample "The Power BI look"; guide section of the same name.
+
 ## 2026-11-08 - v0.6.0
 
 - Each layer now draws the rows where its own value is present, like

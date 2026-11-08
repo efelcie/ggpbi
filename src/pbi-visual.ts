@@ -28,7 +28,7 @@ import { specToCode } from './codegen';
 import { ggpbirText, parseGgpbir, ggpbirReadOnlyMatches, type GgpbirContext } from './ggpbir-codegen';
 import { fromDataView, DEFAULT_ROLE_MAPPING, NUMBERED_ROLES, resolveLabelBinding, restoreSharedFieldAliases, resolveSoloMeasureMode, resolveReferencePositions, isDataTruncated, resolveColor } from './powerbi';
 import { inferGeom } from './auto-geom';
-import { parseHeights } from './facet-layout';
+import { parseHeights, parseRowAxesText } from './facet-layout';
 import { themeDark, themeMinimal, GREY_DEFAULTS } from './theme';
 import { explainError } from './friendly-errors';
 import type { Selection } from './selection';
@@ -916,6 +916,13 @@ export class Visual implements IVisual {
       if (themeInk && themeInk !== GREY_DEFAULTS.ink) themeConfig.ink = themeInk;
       if (themePaper && themePaper !== GREY_DEFAULTS.paper) themeConfig.paper = themePaper;
       if (themeBaseSize && themeBaseSize !== 11) themeConfig.baseSize = themeBaseSize;
+      // Panel elements: only switched-off ones reach the spec (defaults on).
+      if (s.theme.gridX.value === false) themeConfig.gridX = false;
+      if (s.theme.gridY.value === false) themeConfig.gridY = false;
+      if (s.theme.gridMinor.value === false) themeConfig.gridMinor = false;
+      if (s.theme.ticks.value === false) themeConfig.ticks = false;
+      const fontFamily = String(s.theme.fontFamily.value ?? '').trim();
+      if (fontFamily) themeConfig.fontFamily = fontFamily;
       if (isHighContrast) themeConfig.isHighContrast = true;
       // Host palette ALWAYS overrides — PBI-native colors have priority
       if (hostPalette.length > 0) themeConfig.colorPalette = hostPalette;
@@ -951,24 +958,39 @@ export class Visual implements IVisual {
             ...(currencyCode && { currency: currencyCode }),
           },
           fieldLabels,
-          ...(scaleX || scaleY || labelFormatX || labelFormatY || dateFormatX || dateFormatY ? {
-            scales: {
-              ...((scaleX || labelFormatX || dateFormatX) && {
-                x: {
-                  ...(scaleX && { type: scaleX }),
-                  ...(labelFormatX && { labels: labelFormatX }),
-                  ...(dateFormatX && { dateLabels: dateFormatX }),
-                },
-              }),
-              ...((scaleY || labelFormatY || dateFormatY) && {
-                y: {
-                  ...(scaleY && { type: scaleY }),
-                  ...(labelFormatY && { labels: labelFormatY }),
-                  ...(dateFormatY && { dateLabels: dateFormatY }),
-                },
-              }),
-            },
-          } : {}),
+          ...((): { scales?: PlotSpec['scales'] } => {
+            // Only what differs from the pane defaults reaches the spec, so
+            // the generated code stays as short as the chart is plain.
+            const axisExtras = (card: typeof s.scaleX | typeof s.scaleY, objectName: string) => {
+              const unit = extractDropdown(card.labelUnit.value);
+              // Empty picker = theme colour.
+              const color = extractFill(card.labelColor.value, objectName, 'labelColor');
+              const breaks = String(card.dateBreaks.value ?? '').trim();
+              return {
+                ...(unit && unit !== 'none' && { labelUnit: unit as import('./types').AxisScaleConfig['labelUnit'] }),
+                ...(color && { labelColor: color }),
+                ...(breaks && { dateBreaks: breaks }),
+              };
+            };
+            const x = {
+              ...(scaleX && { type: scaleX }),
+              ...(labelFormatX && { labels: labelFormatX }),
+              ...(dateFormatX && { dateLabels: dateFormatX }),
+              ...axisExtras(s.scaleX, 'scaleX'),
+            };
+            const y = {
+              ...(scaleY && { type: scaleY }),
+              ...(labelFormatY && { labels: labelFormatY }),
+              ...(dateFormatY && { dateLabels: dateFormatY }),
+              ...axisExtras(s.scaleY, 'scaleY'),
+              ...(extractDropdown(s.scaleY.position.value) === 'right' && { position: 'right' as const }),
+            };
+            const hasX = Object.keys(x).length > 0;
+            const hasY = Object.keys(y).length > 0;
+            return hasX || hasY
+              ? { scales: { ...(hasX && { x }), ...(hasY && { y }) } }
+              : {};
+          })(),
           xLabel,
           yLabel,
           showLegend,
@@ -999,6 +1021,11 @@ export class Visual implements IVisual {
               ...((): { heights?: number[] } => {
                 const heights = parseHeights(s.facet.heights.value);
                 return heights ? { heights } : {};
+              })(),
+              ...(s.facet.strips.value === false && { strips: false }),
+              ...((): { rowAxes?: string[] } => {
+                const rowAxes = parseRowAxesText(s.facet.rowAxes.value);
+                return rowAxes ? { rowAxes } : {};
               })(),
             },
           }),

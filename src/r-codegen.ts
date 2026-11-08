@@ -80,6 +80,13 @@ function geomArgs(geom: GeomConfig): string {
   return parts.join(', ');
 }
 
+/** Scale options whose R spelling differs from the spec key. */
+export const R_SCALE_ARG: Record<string, string> = {
+  dateBreaks: 'date_breaks',
+  labelUnit: 'label_unit',
+  labelColor: 'label_colour',
+};
+
 function scaleLine(axis: 'x' | 'y', cfg: ScaleType | AxisScaleConfig | undefined): string | undefined {
   if (!cfg) return undefined;
   const conf: AxisScaleConfig = typeof cfg === 'string' ? { type: cfg } : cfg;
@@ -104,7 +111,10 @@ function scaleLine(axis: 'x' | 'y', cfg: ScaleType | AxisScaleConfig | undefined
     if (key === 'labels') { args.push(`labels = ${rString(String(value))}`); continue; }
     if (key === 'dateLabels') { args.push(`date_labels = ${rString(String(value))}`); continue; }
     if (key === 'min' || key === 'max') continue;
-    args.push(`${key} = ${rValue(value)}`);
+    // ggplot2's own names where it has them (date_breaks, position);
+    // ggpbi extensions in the same snake_case.
+    const rKey = R_SCALE_ARG[key] ?? key;
+    args.push(`${rKey} = ${rValue(value)}`);
   }
   const limits = limitsArg(conf);
   if (limits) args.push(limits);
@@ -144,16 +154,21 @@ export function specToR(spec: PlotSpec, labels: CodeFieldLabels = {}): string {
   }
 
   if (spec.facet) {
-    const { wrap, row, col, ncol, nrow, freeX, freeY, heights } = spec.facet;
+    const { wrap, row, col, ncol, nrow, freeX, freeY, heights, strips, rowAxes } = spec.facet;
     const scalesArg =
       freeX && freeY ? ', scales = "free"'
         : freeX ? ', scales = "free_x"'
           : freeY ? ', scales = "free_y"' : '';
+    // ggpbi extensions to the facet call: strip = FALSE (ggplot2 spells it
+    // theme(strip.text = element_blank())) and row_axes, which ggplot2
+    // has no counterpart for.
+    const extArgs = (strips === false ? ', strip = FALSE' : '')
+      + (rowAxes && rowAxes.length > 0 ? `, row_axes = ${rValue(rowAxes)}` : '');
     if (wrap) {
       const extra = ncol ? `, ncol = ${ncol}` : nrow ? `, nrow = ${nrow}` : '';
-      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg})`);
+      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg}${extArgs})`);
     } else if (row || col) {
-      lines.push(`  facet_grid(${row ? rName(row) : '.'} ~ ${col ? rName(col) : '.'}${scalesArg})`);
+      lines.push(`  facet_grid(${row ? rName(row) : '.'} ~ ${col ? rName(col) : '.'}${scalesArg}${extArgs})`);
     }
     // Relative row heights: ggplot2 itself has no fixed-ratio panel
     // sizes; ggh4x's force_panelsizes is the closest equivalent.

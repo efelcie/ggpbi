@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import { AreaGeomConfig } from '../types';
 import { BoundPoint } from '../bind-data';
 import type { PathNode, NodeStyle } from '../scene-types';
-import { sortByX, groupByColor, bandOffset, filterNA, GEOM_DEFAULT_COLOR } from './util';
+import { sortByX, groupByColor, bandOffset, filterNA, GEOM_DEFAULT_COLOR, linetypeToDasharray } from './util';
 
 // ---------------------------------------------------------------------------
 // Area Scene Builder — pure geometry computation, no DOM
@@ -36,23 +36,49 @@ export function areaToScene(
     .y0(yScale(0))
     .y1(d => yScale(d.y));
 
-  const buildNode = (pts: BoundPoint[], color: string): PathNode | null => {
+  // An outline along the top edge — ggplot2's geom_area(colour =,
+  // linewidth =, outline.type = "upper"). It appears when the layer has a
+  // size, in the layer's colour at full opacity: alpha thins the fill
+  // only, as in ggplot2. A filled LTM line is one layer, not two.
+  const outlineWidth = config.size;
+  const upper = d3.line<BoundPoint>()
+    .x(d => xScale(d.x) + bw)
+    .y(d => yScale(d.y));
+  const dasharray = linetypeToDasharray(config.linetype, outlineWidth);
+
+  const buildNodes = (pts: BoundPoint[], color: string): PathNode[] => {
     const sorted = sortByX(pts);
     const pathD = area(sorted) ?? '';
-    if (!pathD) return null;
+    if (!pathD) return [];
 
     const style: NodeStyle = {
       fill: color,
       opacity: defaultAlpha,
     };
 
-    return {
+    const nodes: PathNode[] = [{
       type: 'path',
       class: 'ggpbi-area',
       d: pathD,
       style,
       data: sorted[0], // first point as representative
-    };
+    }];
+    if (outlineWidth !== undefined && outlineWidth > 0) {
+      nodes.push({
+        type: 'path',
+        class: 'ggpbi-area-outline',
+        d: upper(sorted) ?? '',
+        style: {
+          fill: 'none',
+          stroke: color,
+          strokeWidth: outlineWidth,
+          strokeLinejoin: 'round',
+          ...(dasharray && { strokeDasharray: dasharray }),
+        },
+        data: sorted[0],
+      });
+    }
+    return nodes;
   };
 
   const result: PathNode[] = [];
@@ -60,12 +86,10 @@ export function areaToScene(
   if (groups) {
     groups.forEach((groupPoints, key) => {
       const color = colorScale ? colorScale(String(key)) : defaultColor;
-      const node = buildNode(groupPoints, color);
-      if (node) result.push(node);
+      result.push(...buildNodes(groupPoints, color));
     });
   } else {
-    const node = buildNode(areaPoints, defaultColor);
-    if (node) result.push(node);
+    result.push(...buildNodes(areaPoints, defaultColor));
   }
 
   return result;

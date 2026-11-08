@@ -16,6 +16,7 @@
 import { ELIDED, FUNC, type CodePatch, type ParseResult } from './code-parse';
 import { GEOM_TO_R } from './r-codegen';
 import { themeDark, themeMinimal } from './theme';
+import { parseRowAxes } from './facet-layout';
 
 // --- Vocabulary -------------------------------------------------------------
 
@@ -360,6 +361,9 @@ function mapScale(call: RCall, patch: CodePatch): void {
     if (arg.name === 'trans') { cfg.type = arg.value; continue; }
     if (arg.name === 'labels') { cfg.labels = arg.value; continue; }
     if (arg.name === 'date_labels') { cfg.dateLabels = arg.value; continue; }
+    if (arg.name === 'date_breaks') { cfg.dateBreaks = arg.value; continue; }
+    if (arg.name === 'label_unit') { cfg.labelUnit = arg.value; continue; }
+    if (arg.name === 'label_colour' || arg.name === 'label_color') { cfg.labelColor = arg.value; continue; }
     cfg[arg.name] = arg.value;
   }
   patch.scales = { ...(patch.scales ?? {}), [axis]: cfg };
@@ -401,6 +405,20 @@ function mapFacet(call: RCall, patch: CodePatch): void {
       continue;
     }
     if (arg.name === 'ncol' || arg.name === 'nrow') { facet[arg.name] = v; continue; }
+    // ggpbi extensions: strip = FALSE, row_axes = c("xy", "none").
+    if (arg.name === 'strip') {
+      if (typeof v !== 'boolean') throw new ParseError('strip takes TRUE or FALSE', arg.line);
+      if (v === false) facet.strips = false;
+      continue;
+    }
+    if (arg.name === 'row_axes') {
+      const entries = (Array.isArray(v) ? v : [v]).map(String);
+      if (!entries.every(e => parseRowAxes(e) !== undefined)) {
+        throw new ParseError('row_axes takes "x", "y", "xy" or "none" per row, e.g. c("xy", "none")', arg.line);
+      }
+      facet.rowAxes = entries;
+      continue;
+    }
     if (arg.name === 'scales') {
       if (v === 'free') { facet.freeX = true; facet.freeY = true; }
       else if (v === 'free_x') facet.freeX = true;

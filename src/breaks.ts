@@ -1,7 +1,7 @@
 import type { LabelFormat } from './types';
 import {
-  formatPlain, formatPercent, formatCompact, formatThousands, formatCurrency,
-  type FormatOptions,
+  formatPlain, formatPercent, formatCompact, formatThousands, formatCurrency, formatInUnit,
+  type FormatOptions, type LabelUnit,
 } from './format';
 
 /**
@@ -227,9 +227,14 @@ export function formatBreaks(breaks: number[]): string[] {
 export function formatBreaksAs(
   breaks: number[],
   format?: LabelFormat,
-  opts: FormatOptions = {},
+  opts: FormatOptions & { unit?: LabelUnit } = {},
 ): string[] {
   if (typeof format === 'function') return breaks.map(v => format(v));
+  // A fixed display unit reshapes the plain and grouped formats; compact
+  // picks its own units, percent and currency keep theirs.
+  if (opts.unit && opts.unit !== 'none' && (!format || format === 'auto' || format === 'thousands')) {
+    return formatInUnit(breaks, opts.unit, opts, format === 'thousands');
+  }
   switch (format) {
     case 'percent': return formatPercent(breaks, opts);
     case 'compact': return formatCompact(breaks, opts);

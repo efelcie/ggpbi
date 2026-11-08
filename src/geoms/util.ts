@@ -73,16 +73,25 @@ export function filterNA(
   return filtered;
 }
 
-/** Convert linetype name to SVG stroke-dasharray value. */
-export function linetypeToDasharray(linetype?: LinetypeType): string | null {
+/**
+ * Convert linetype name to SVG stroke-dasharray value.
+ *
+ * Dash lengths grow with the line once it is wider than the default 2 px,
+ * as R scales its dash patterns by the line width: a 3 px dashed line in
+ * a 3× layout keeps the look of a dashed line instead of turning dotted.
+ */
+export function linetypeToDasharray(linetype?: LinetypeType, lineWidth?: number): string | null {
+  let pattern: number[];
   switch (linetype) {
-    case 'dashed':   return '6 4';
-    case 'dotted':   return '2 3';
-    case 'dashdot':  return '6 3 2 3';
-    case 'longdash': return '10 4';
-    case 'twodash':  return '2 2 8 2';
+    case 'dashed':   pattern = [6, 4]; break;
+    case 'dotted':   pattern = [2, 3]; break;
+    case 'dashdot':  pattern = [6, 3, 2, 3]; break;
+    case 'longdash': pattern = [10, 4]; break;
+    case 'twodash':  pattern = [2, 2, 8, 2]; break;
     default:         return null; // 'solid' or undefined
   }
+  const k = lineWidth !== undefined && lineWidth > 2 ? lineWidth / 2 : 1;
+  return pattern.map(v => Math.round(v * k * 100) / 100).join(' ');
 }
 
 /** Return band center offset (half bandwidth) for band scales, 0 for others. */

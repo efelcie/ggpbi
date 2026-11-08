@@ -1,10 +1,10 @@
 import * as d3 from 'd3';
-import { PlotSpec, DataPoint, AesMapping, GeomConfig, PlotOptions, ScaleType } from './types';
+import { PlotSpec, DataPoint, AesMapping, GeomConfig, PlotOptions, ScaleType, AxisScaleConfig } from './types';
 import { bindData, type BoundPoint } from './bind-data';
 import { createScale, createSizeScale } from './scales';
 import { computePosition } from './position';
 import { extendedBreaks, formatBreaksAs } from './breaks';
-import { layoutFacetGrid } from './facet-layout';
+import { layoutFacetGrid, facetDims, parseRowAxes } from './facet-layout';
 import { Tooltip, attachTooltip, attachPbiTooltip } from './tooltip';
 import { Selection } from './selection';
 import { inferScaleLevel } from './auto-geom';
@@ -23,6 +23,7 @@ import {
   isMissingValue,
   estimateTextWidth,
   AXIS_TICK_PADDING,
+  isBlankLabel,
   type BuiltPlot,
 } from './pipeline';
 
@@ -160,12 +161,27 @@ function createSvg(
     .attr('class', 'ggpbi-visual')
     .attr('role', 'img')
     .attr('aria-label', chartLabel)
-    .style('pointer-events', 'none');
+    .style('pointer-events', 'none')
+    // Every text inherits the theme's family (ggplot2 base_family).
+    .style('font-family', built.theme.fontFamily);
 
   const g = svg.append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
   return { svg, g };
+}
+
+/** The axis options a panel takes from the scale configs. */
+function axisOptions(xCfg: AxisScaleConfig, yCfg: AxisScaleConfig) {
+  return {
+    yPosition: yCfg.position,
+    xLabelUnit: xCfg.labelUnit,
+    yLabelUnit: yCfg.labelUnit,
+    xLabelColor: xCfg.labelColor,
+    yLabelColor: yCfg.labelColor,
+    xDateBreaks: xCfg.dateBreaks,
+    yDateBreaks: yCfg.dateBreaks,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,42 +199,15 @@ function renderFaceted(
   const rowField = facet.row;
   const colField = facet.col;
 
-  // Facet levels are sorted like ggplot2 factor levels: numerically when all
-  // values are numbers (4, 6, 8 — not data order), alphabetically otherwise.
-  // They come from every row, so a level that only one layer has values
-  // for still gets its panel.
-  const levelSort = (a: string, b: string): number => {
-    const na = Number(a);
-    const nb = Number(b);
-    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-    return a.localeCompare(b);
-  };
-  // facet_wrap: one variable wrapped row-major into a roughly square grid.
-  // Takes precedence over row/col.
+  // facet_wrap: one variable wrapped row-major into a roughly square grid;
+  // takes precedence over row/col. Levels sort like ggplot2 factor levels
+  // and come from every row, so a level only one layer has values for
+  // still gets its panel.
   const wrapField = facet.wrap;
-  const wrapLevels = wrapField
-    ? Array.from(new Set(data.map(d => String((d as any)[wrapField])))).sort(levelSort)
-    : [];
-
-  const rowLevels = !wrapField && rowField
-    ? Array.from(new Set(data.map(d => String((d as any)[rowField])))).sort(levelSort)
-    : [''];
-  const colLevels = !wrapField && colField
-    ? Array.from(new Set(data.map(d => String((d as any)[colField])))).sort(levelSort)
-    : [''];
-
-  let nRows: number;
-  let nCols: number;
-  if (wrapField) {
-    // ggplot2 wrap_dims: ncol wins, else derive from nrow, else ceil(sqrt(n)).
-    const n = wrapLevels.length;
-    nCols = facet.ncol ?? (facet.nrow ? Math.ceil(n / facet.nrow) : Math.ceil(Math.sqrt(n)));
-    nCols = Math.max(1, Math.min(nCols, n));
-    nRows = Math.ceil(n / nCols);
-  } else {
-    nRows = Math.max(1, rowLevels.length);
-    nCols = Math.max(1, colLevels.length);
-  }
+  const { wrapLevels, rowLevels, colLevels, nRows, nCols } =
+    facetDims(facet, data as Array<Record<string, unknown>>);
+  const showStrips = facet.strips !== false;
+  const yRight = parseScaleConfig(spec.scales?.y).position === 'right';
 
   // Parse scale configs for per-cell scale creation
   const xCfg = parseScaleConfig(spec.scales?.x);
@@ -350,23 +339,22 @@ function renderFaceted(
       const ticks = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi
         ? extendedBreaks(lo, hi, theme.nBreaks).filter(t => t >= lo && t <= hi)
         : [];
-      labels = formatBreaksAs(ticks, yCfg.labels, spec.format);
+      labels = formatBreaksAs(ticks, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
     }
     return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme.axisTextSize)), 0);
   };
+  const outerCol = yRight ? nCols - 1 : 0;
+  const rowAxes = (facet.rowAxes ?? []).map(parseRowAxes);
   const colLabelWidth: number[] = Array.from({ length: nCols }, () => 0);
   for (const cell of cells) {
-    if (cell.c === 0 || facet.freeY) {
+    if (cell.c === outerCol || facet.freeY || rowAxes[cell.r]?.y) {
       colLabelWidth[cell.c] = Math.max(colLabelWidth[cell.c], yLabelWidth(cell));
     }
   }
   const tickRoom = theme.tickLength + AXIS_TICK_PADDING;
   // What the outer margin already holds for column 0's tick labels: all of
   // it except the plot margin and the y-axis title strip.
-  const reservedLeft = Math.max(
-    0,
-    built.layout.margin.left - (theme.halfLine * 2 + theme.axisTitleSize + theme.axisTitleMargin),
-  );
+  const reservedLeft = built.layout.yAxisRoom ?? 0;
   const present = new Set(cells.map(cell => `${cell.r},${cell.c}`));
   // ggplot2 strip: the strip text (rel(0.8)) with 0.8 × half_line above and below.
   const stripH = Math.round(theme.axisTextSize + 1.6 * theme.halfLine);
@@ -378,8 +366,10 @@ function renderFaceted(
     innerHeight,
     freeX: !!facet.freeX,
     freeY: !!facet.freeY,
-    stripAbove: r => !!wrapField || (!!colField && r === 0),
-    stripRight: !wrapField && !!rowField,
+    stripAbove: r => showStrips && (!!wrapField || (!!colField && r === 0)),
+    stripRight: showStrips && !wrapField && !!rowField,
+    yAxisSide: yRight ? 'right' : 'left',
+    rowAxes,
     heights: facet.heights,
     yAxisWidth: c => colLabelWidth[c] + tickRoom,
     reservedLeft,
@@ -423,13 +413,13 @@ function renderFaceted(
 
     // Strips: above the panel for wrap and grid columns, right of the last
     // column for grid rows — where ggplot2 puts them.
-    if (wrapField) {
+    if (showStrips && wrapField) {
       stripText(facetG, 'ggpbi-facet-strip-wrap', pos.width / 2, -stripH / 2, cell.label.wrap!);
     }
-    if (!wrapField && colField && pos.r === 0) {
+    if (showStrips && !wrapField && colField && pos.r === 0) {
       stripText(facetG, 'ggpbi-facet-strip-col', pos.width / 2, -stripH / 2, cell.label.col);
     }
-    if (!wrapField && rowField && pos.c === nCols - 1) {
+    if (showStrips && !wrapField && rowField && pos.c === nCols - 1) {
       stripText(facetG, 'ggpbi-facet-strip-row', pos.width + stripH / 2, pos.height / 2, cell.label.row, true);
     }
 
@@ -446,6 +436,7 @@ function renderFaceted(
       format: spec.format,
       xDateFormat: xCfg.dateLabels,
       yDateFormat: yCfg.dateLabels,
+      ...axisOptions(xCfg, yCfg),
       showXAxis: pos.showXAxis,
       showYAxis: pos.showYAxis,
     });
@@ -477,32 +468,44 @@ function renderLabelsAndLegend(
       .text(subtitle);
   }
 
-  if (spec.xLabel) {
+  if (spec.xLabel && !isBlankLabel(spec.xLabel)) {
     g.append('text')
       .attr('class', 'ggpbi-axis-label-x')
       .attr('x', innerWidth / 2)
-      .attr('y', innerHeight + theme.margin.bottom - theme.axisTitleMargin)
+      .attr('y', innerHeight + layout.margin.bottom - theme.axisTitleMargin)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${theme.axisTitleSize}px`)
       .attr('fill', theme.ink)
       .text(spec.xLabel);
   }
 
-  if (spec.yLabel) {
-    g.append('text')
+  // A right-hand y axis (ggplot2 position = "right") puts its title on the
+  // right, reading top to bottom like axis.title.y.right.
+  const yRight = parseScaleConfig(spec.scales?.y).position === 'right';
+  const rightAxisRoom = yRight ? layout.margin.right - legend.width - theme.halfLine * 2 : 0;
+  if (spec.yLabel && !isBlankLabel(spec.yLabel)) {
+    const title = g.append('text')
       .attr('class', 'ggpbi-axis-label-y')
-      .attr('transform', 'rotate(-90)')
-      .attr('x', -innerHeight / 2)
-      .attr('y', -layout.margin.left + theme.axisTitleSize + theme.axisTitleMargin)
       .attr('text-anchor', 'middle')
       .attr('font-size', `${theme.axisTitleSize}px`)
       .attr('fill', theme.ink)
       .text(spec.yLabel);
+    if (yRight) {
+      const x = innerWidth + rightAxisRoom - theme.axisTitleSize * 0.2;
+      title.attr('transform', `translate(${x},${innerHeight / 2}) rotate(90)`)
+        .attr('x', 0)
+        .attr('y', 0);
+    } else {
+      title.attr('transform', 'rotate(-90)')
+        .attr('x', -innerHeight / 2)
+        .attr('y', -layout.margin.left + theme.axisTitleSize + theme.axisTitleMargin);
+    }
   }
 
   const showLegend = spec.showLegend !== false;
   if (showLegend && legend.entries.length > 0 && spec.aes.color) {
-    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map(l => l.geom), theme, innerWidth);
+    // Past the right-hand axis when there is one.
+    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map(l => l.geom), theme, innerWidth + rightAxisRoom);
   }
 }
 
@@ -558,6 +561,7 @@ export function renderWithState(
       format: built.spec.format,
       xDateFormat: parseScaleConfig(built.spec.scales?.x).dateLabels,
       yDateFormat: parseScaleConfig(built.spec.scales?.y).dateLabels,
+      ...axisOptions(parseScaleConfig(built.spec.scales?.x), parseScaleConfig(built.spec.scales?.y)),
     });
   }
 

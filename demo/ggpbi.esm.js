@@ -327,6 +327,9 @@ function axis(orient, scale) {
   };
   return axis2;
 }
+function axisRight(scale) {
+  return axis(right, scale);
+}
 function axisBottom(scale) {
   return axis(bottom, scale);
 }
@@ -4960,6 +4963,41 @@ function formatCompact(breaks, opts = {}) {
   };
   return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
 }
+var UNIT_SCALE = {
+  thousands: 1e3,
+  millions: 1e6,
+  billions: 1e9
+};
+var UNIT_FALLBACK = {
+  thousands: "K",
+  millions: "M",
+  billions: "B"
+};
+function unitSuffix(unit2, locale3) {
+  try {
+    const parts = new Intl.NumberFormat(locale3, { notation: "compact", compactDisplay: "short" }).formatToParts(UNIT_SCALE[unit2]);
+    const i = parts.findIndex((p) => p.type === "compact");
+    if (i >= 0) {
+      const before = i > 0 && parts[i - 1].type === "literal" ? parts[i - 1].value : "";
+      const integer = parts.filter((p) => p.type === "integer").map((p) => p.value).join("");
+      if (integer === "1") return before + parts[i].value;
+    }
+  } catch {
+  }
+  return UNIT_FALLBACK[unit2];
+}
+function formatInUnit(breaks, unit2, opts = {}, grouping = false) {
+  const scale = UNIT_SCALE[unit2];
+  const scaled = breaks.map((v) => v / scale);
+  const decimals = breakDecimals(scaled);
+  const nf = intl(opts.locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: grouping
+  });
+  const suffix = unitSuffix(unit2, opts.locale);
+  return scaled.map((v) => nf.format(v) + suffix);
+}
 function formatCurrency(breaks, opts = {}) {
   const decimals = Math.min(breakDecimals(breaks), 2);
   const nf = intl(opts.locale, {
@@ -5139,6 +5177,9 @@ function formatBreaks(breaks) {
 }
 function formatBreaksAs(breaks, format2, opts = {}) {
   if (typeof format2 === "function") return breaks.map((v) => format2(v));
+  if (opts.unit && opts.unit !== "none" && (!format2 || format2 === "auto" || format2 === "thousands")) {
+    return formatInUnit(breaks, opts.unit, opts, format2 === "thousands");
+  }
   switch (format2) {
     case "percent":
       return formatPercent(breaks, opts);
@@ -5235,21 +5276,29 @@ function filterNA(points, naRm = false, geomName = "geom", fields = ["x", "y"]) 
   }
   return filtered;
 }
-function linetypeToDasharray(linetype) {
+function linetypeToDasharray(linetype, lineWidth) {
+  let pattern;
   switch (linetype) {
     case "dashed":
-      return "6 4";
+      pattern = [6, 4];
+      break;
     case "dotted":
-      return "2 3";
+      pattern = [2, 3];
+      break;
     case "dashdot":
-      return "6 3 2 3";
+      pattern = [6, 3, 2, 3];
+      break;
     case "longdash":
-      return "10 4";
+      pattern = [10, 4];
+      break;
     case "twodash":
-      return "2 2 8 2";
+      pattern = [2, 2, 8, 2];
+      break;
     default:
       return null;
   }
+  const k = lineWidth !== void 0 && lineWidth > 2 ? lineWidth / 2 : 1;
+  return pattern.map((v) => Math.round(v * k * 100) / 100).join(" ");
 }
 function bandOffset(scale) {
   return typeof scale.bandwidth === "function" ? scale.bandwidth() / 2 : 0;
@@ -5456,7 +5505,7 @@ function linesToScene(points, xScale, yScale, config, colorScale) {
   const defaultAlpha = config.alpha ?? 1;
   const defaultColor = config.color ?? GEOM_DEFAULT_COLOR;
   const strokeWidth = config.size ?? 2;
-  const dasharray = linetypeToDasharray(config.linetype);
+  const dasharray = linetypeToDasharray(config.linetype, config.size ?? 2);
   const lineend = config.lineend ?? "butt";
   const linejoin = config.linejoin ?? "round";
   const linemitre = config.linemitre ?? 10;
@@ -5682,34 +5731,51 @@ function areaToScene(points, xScale, yScale, config, colorScale) {
   const defaultColor = config.color ?? GEOM_DEFAULT_COLOR;
   const bw = bandOffset(xScale);
   const area = area_default().x((d) => xScale(d.x) + bw).y0(yScale(0)).y1((d) => yScale(d.y));
-  const buildNode = (pts, color2) => {
+  const outlineWidth = config.size;
+  const upper = line_default().x((d) => xScale(d.x) + bw).y((d) => yScale(d.y));
+  const dasharray = linetypeToDasharray(config.linetype, outlineWidth);
+  const buildNodes = (pts, color2) => {
     const sorted = sortByX(pts);
     const pathD = area(sorted) ?? "";
-    if (!pathD) return null;
+    if (!pathD) return [];
     const style = {
       fill: color2,
       opacity: defaultAlpha
     };
-    return {
+    const nodes = [{
       type: "path",
       class: "ggpbi-area",
       d: pathD,
       style,
       data: sorted[0]
       // first point as representative
-    };
+    }];
+    if (outlineWidth !== void 0 && outlineWidth > 0) {
+      nodes.push({
+        type: "path",
+        class: "ggpbi-area-outline",
+        d: upper(sorted) ?? "",
+        style: {
+          fill: "none",
+          stroke: color2,
+          strokeWidth: outlineWidth,
+          strokeLinejoin: "round",
+          ...dasharray && { strokeDasharray: dasharray }
+        },
+        data: sorted[0]
+      });
+    }
+    return nodes;
   };
   const result = [];
   const groups2 = groupByColor(areaPoints);
   if (groups2) {
     groups2.forEach((groupPoints, key) => {
       const color2 = colorScale ? colorScale(String(key)) : defaultColor;
-      const node = buildNode(groupPoints, color2);
-      if (node) result.push(node);
+      result.push(...buildNodes(groupPoints, color2));
     });
   } else {
-    const node = buildNode(areaPoints, defaultColor);
-    if (node) result.push(node);
+    result.push(...buildNodes(areaPoints, defaultColor));
   }
   return result;
 }
@@ -7714,6 +7780,39 @@ function computePosition(points, geom) {
 }
 
 // src/facet-layout.ts
+function parseRowAxes(entry) {
+  if (typeof entry !== "string") return void 0;
+  const e = entry.trim().toLowerCase();
+  if (e === "") return void 0;
+  if (e === "none" || e === "-") return { x: false, y: false };
+  if (!/^[xy]+$/.test(e)) return void 0;
+  return { x: e.includes("x"), y: e.includes("y") };
+}
+function facetDims(facet, data) {
+  const levelSort = (a, b) => {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  };
+  const levels = (field) => Array.from(new Set(data.map((d) => String(d[field])))).sort(levelSort);
+  const wrapLevels = facet.wrap ? levels(facet.wrap) : [];
+  const rowLevels = !facet.wrap && facet.row ? levels(facet.row) : [""];
+  const colLevels = !facet.wrap && facet.col ? levels(facet.col) : [""];
+  if (facet.wrap) {
+    const n = wrapLevels.length;
+    let nCols = facet.ncol ?? (facet.nrow ? Math.ceil(n / facet.nrow) : Math.ceil(Math.sqrt(n)));
+    nCols = Math.max(1, Math.min(nCols, n));
+    return { wrapLevels, rowLevels, colLevels, nRows: Math.max(1, Math.ceil(n / nCols)), nCols };
+  }
+  return {
+    wrapLevels,
+    rowLevels,
+    colLevels,
+    nRows: Math.max(1, rowLevels.length),
+    nCols: Math.max(1, colLevels.length)
+  };
+}
 function rowWeights(nRows, heights) {
   const valid = (heights ?? []).filter((h) => Number.isFinite(h) && h > 0);
   if (valid.length === 0) return Array.from({ length: nRows }, () => 1);
@@ -7721,17 +7820,32 @@ function rowWeights(nRows, heights) {
 }
 function layoutFacetGrid(input) {
   const { nRows, nCols, present, innerWidth, innerHeight: innerHeight2, metrics } = input;
-  const showX = (r, c) => input.freeX || r === nRows - 1 || !present(r + 1, c);
-  const showY = (_r, c) => input.freeY || c === 0;
-  const xAxisRoom = (r) => input.freeX && r < nRows - 1 ? metrics.xAxis : 0;
-  const yAxisRoom = (c) => input.freeY && c > 0 ? input.yAxisWidth(c) : 0;
+  const right2 = input.yAxisSide === "right";
+  const outerCol = right2 ? nCols - 1 : 0;
+  const override = (r) => input.rowAxes?.[r];
+  const showX = (r, c) => override(r)?.x ?? (input.freeX || r === nRows - 1 || !present(r + 1, c));
+  const showY = (r, c) => override(r)?.y ?? (input.freeY || c === outerCol);
+  const xAxisRoom = (r) => {
+    if (r >= nRows - 1) return 0;
+    for (let c = 0; c < nCols; c++) {
+      if (present(r, c) && showX(r, c) && present(r + 1, c)) return metrics.xAxis;
+    }
+    return 0;
+  };
+  const yAxisRoom = (c) => {
+    if (c === outerCol) return 0;
+    for (let r = 0; r < nRows; r++) {
+      if (present(r, c) && showY(r, c)) return input.yAxisWidth(c);
+    }
+    return 0;
+  };
   const stripAbove = (r) => input.stripAbove(r) ? metrics.strip : 0;
-  const extraLeft = Math.max(0, input.yAxisWidth(0) - input.reservedLeft);
+  const extraOuter = Math.max(0, input.yAxisWidth(outerCol) - input.reservedLeft);
   const stripRight = input.stripRight ? metrics.strip : 0;
   let interiorY = 0;
-  for (let c = 1; c < nCols; c++) interiorY += yAxisRoom(c);
+  for (let c = 0; c < nCols; c++) interiorY += yAxisRoom(c);
   const colGap = metrics.colSpacing ?? metrics.spacing;
-  const availW = innerWidth - extraLeft - interiorY - colGap * (nCols - 1) - stripRight;
+  const availW = innerWidth - extraOuter - interiorY - colGap * (nCols - 1) - stripRight;
   const panelW = Math.max(1, availW / nCols);
   let fixedH = metrics.spacing * (nRows - 1);
   for (let r = 0; r < nRows; r++) fixedH += stripAbove(r) + xAxisRoom(r);
@@ -7740,11 +7854,12 @@ function layoutFacetGrid(input) {
   const total = weights.reduce((a, w) => a + w, 0);
   const rowH = weights.map((w) => Math.max(1, availH * w / total));
   const colX = [];
-  let x2 = extraLeft;
+  let x2 = right2 ? 0 : extraOuter;
   for (let c = 0; c < nCols; c++) {
-    x2 += yAxisRoom(c);
+    if (!right2) x2 += yAxisRoom(c);
     colX.push(x2);
     x2 += panelW + colGap;
+    if (right2) x2 += yAxisRoom(c);
   }
   const rowY = [];
   let y2 = 0;
@@ -8384,6 +8499,7 @@ var PBI_DEFAULT_PALETTE = [
   "#D64550"
   // red
 ];
+var DEFAULT_FONT_FAMILY = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
 var DEFAULT_CONFIG = {
   baseSize: 11,
   axisTextOverlap: "hide",
@@ -8395,7 +8511,12 @@ var DEFAULT_CONFIG = {
   panelFill: "#EBEBEB",
   gridColor: "#ffffff",
   colorPalette: PBI_DEFAULT_PALETTE,
-  isHighContrast: false
+  isHighContrast: false,
+  gridX: true,
+  gridY: true,
+  gridMinor: true,
+  ticks: true,
+  fontFamily: DEFAULT_FONT_FAMILY
 };
 function mixColor(hex1, hex2, ratio) {
   const parse = (h) => {
@@ -8427,7 +8548,9 @@ function resolveTheme(config = {}) {
     plotTitleSize: c.baseSize * 1.2,
     plotCaptionSize: c.baseSize * 0.8,
     legendTextSize: c.baseSize * 0.8,
-    tickLength: 0.5 * halfLine,
+    // Without tick marks the labels keep their gap but the tick length
+    // goes (ggplot2: axis.ticks = element_blank()).
+    tickLength: c.ticks ? 0.5 * halfLine : 0,
     axisTextMargin: 0.8 * halfLine / 2,
     axisTitleMargin: halfLine / 2,
     margin,
@@ -8444,7 +8567,12 @@ function resolveTheme(config = {}) {
     pointSize: c.baseSize / 11 * 1.5,
     colorPalette: c.colorPalette,
     isHighContrast: c.isHighContrast,
-    highContrastStrokeWidth: c.isHighContrast ? 2 : 0
+    highContrastStrokeWidth: c.isHighContrast ? 2 : 0,
+    gridX: c.gridX,
+    gridY: c.gridY,
+    gridMinor: c.gridMinor,
+    ticks: c.ticks,
+    fontFamily: c.fontFamily || DEFAULT_FONT_FAMILY
   };
 }
 function axisLabelPriority(n) {
@@ -8594,6 +8722,25 @@ function renderSceneNodes(g, nodes) {
 }
 
 // src/panel.ts
+function parseDateBreaks(text) {
+  if (!text) return void 0;
+  const m = /^\s*(\d+)?\s*(day|week|month|quarter|year)s?\s*$/i.exec(text);
+  if (!m) return void 0;
+  const n = Math.max(1, Number(m[1] ?? 1));
+  switch (m[2].toLowerCase()) {
+    case "day":
+      return timeDay.every(n) ?? void 0;
+    case "week":
+      return timeSunday.every(n) ?? void 0;
+    case "month":
+      return timeMonth.every(n) ?? void 0;
+    case "quarter":
+      return timeMonth.every(3 * n) ?? void 0;
+    case "year":
+      return timeYear.every(n) ?? void 0;
+  }
+  return void 0;
+}
 var clipCounter = 0;
 function nextClipId(suffix) {
   clipCounter += 1;
@@ -8606,7 +8753,8 @@ function ggBreaks(scale, nBreaks, labelFormat, fmt = {}) {
   if (dom.length < 2) return void 0;
   if (dom[0] instanceof Date || dom[1] instanceof Date) {
     if (typeof scale.ticks !== "function") return void 0;
-    const dateTicks = scale.ticks(nBreaks);
+    const interval2 = parseDateBreaks(fmt.dateBreaks);
+    const dateTicks = interval2 ? scale.ticks(interval2) : scale.ticks(nBreaks);
     if (dateTicks.length === 0) return void 0;
     return { ticks: dateTicks, labels: formatDates(dateTicks, fmt.dateFormat, fmt) };
   }
@@ -8655,31 +8803,31 @@ function renderPanel(ctx) {
     xScale,
     theme2.nBreaks,
     ctx.xLabelFormat,
-    { ...ctx.format, dateFormat: ctx.xDateFormat }
+    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit }
   );
   const yBreaks = ggBreaks(
     yScale,
     theme2.nBreaks,
     ctx.yLabelFormat,
-    { ...ctx.format, dateFormat: ctx.yDateFormat }
+    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit }
   );
   const isBandX = typeof xScale.bandwidth === "function";
   const xTicks = isBandX ? [] : xBreaks?.ticks ?? (xScale.ticks ? xScale.ticks(theme2.nBreaks) : []);
   const yTicks = yBreaks?.ticks ?? (yScale.ticks ? yScale.ticks(theme2.nBreaks) : []);
   const yDom = yScale.domain?.();
   const xDom = xScale.domain?.();
-  const yMinor = yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
-  const xMinor = isBandX ? [] : xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : [];
+  const yMinor = theme2.gridY && theme2.gridMinor && yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
+  const xMinor = isBandX || !theme2.gridX || !theme2.gridMinor ? [] : xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : [];
   for (const tick of yMinor) {
     panelG.append("line").attr("class", "ggpbi-grid-minor").attr("x1", 0).attr("x2", innerWidth).attr("y1", yScale(tick)).attr("y2", yScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize * 0.5);
   }
   for (const tick of xMinor) {
     panelG.append("line").attr("class", "ggpbi-grid-minor").attr("y1", 0).attr("y2", innerHeight2).attr("x1", xScale(tick)).attr("x2", xScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize * 0.5);
   }
-  for (const tick of yTicks) {
+  for (const tick of theme2.gridY ? yTicks : []) {
     panelG.append("line").attr("class", "ggpbi-grid").attr("x1", 0).attr("x2", innerWidth).attr("y1", yScale(tick)).attr("y2", yScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize);
   }
-  for (const tick of xTicks) {
+  for (const tick of theme2.gridX ? xTicks : []) {
     panelG.append("line").attr("class", "ggpbi-grid").attr("y1", 0).attr("y2", innerHeight2).attr("x1", xScale(tick)).attr("x2", xScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize);
   }
   const clipId = nextClipId(ctx.clipSuffix ?? "panel");
@@ -8691,7 +8839,8 @@ function renderPanel(ctx) {
   } else {
     xAxis.ticks(theme2.nBreaks);
   }
-  const yAxis = axisLeft(yScale).tickSize(theme2.tickLength).tickSizeOuter(0);
+  const yRight = ctx.yPosition === "right";
+  const yAxis = (yRight ? axisRight : axisLeft)(yScale).tickSize(theme2.tickLength).tickSizeOuter(0);
   if (yBreaks) {
     yAxis.tickValues(yBreaks.ticks).tickFormat((_d, i) => yBreaks.labels[i] ?? "");
   } else {
@@ -8699,12 +8848,14 @@ function renderPanel(ctx) {
   }
   const xAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-x").attr("transform", `translate(0,${innerHeight2})`).call(xAxis);
   if (ctx.showXAxis === false) xAxisGroup.remove();
-  xAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
+  xAxisGroup.attr("font-family", theme2.fontFamily);
+  xAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", ctx.xLabelColor ?? theme2.axisTextColor);
   xAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   xAxisGroup.select(".domain").style("display", "none");
-  const yAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-y").call(yAxis);
+  const yAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-y").attr("font-family", theme2.fontFamily).call(yAxis);
+  if (yRight) yAxisGroup.attr("transform", `translate(${innerWidth},0)`);
   if (ctx.showYAxis === false) yAxisGroup.remove();
-  yAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
+  yAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", ctx.yLabelColor ?? theme2.axisTextColor);
   yAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   yAxisGroup.select(".domain").style("display", "none");
   if (theme2.axisTextOverlap === "hide") {
@@ -8978,6 +9129,11 @@ function geomArgs(geom) {
   }
   return parts.join(", ");
 }
+var R_SCALE_ARG = {
+  dateBreaks: "date_breaks",
+  labelUnit: "label_unit",
+  labelColor: "label_colour"
+};
 function scaleLine(axis2, cfg) {
   if (!cfg) return void 0;
   const conf = typeof cfg === "string" ? { type: cfg } : cfg;
@@ -9010,7 +9166,8 @@ function scaleLine(axis2, cfg) {
       continue;
     }
     if (key === "min" || key === "max") continue;
-    args.push(`${key} = ${rValue(value)}`);
+    const rKey = R_SCALE_ARG[key] ?? key;
+    args.push(`${rKey} = ${rValue(value)}`);
   }
   const limits = limitsArg(conf);
   if (limits) args.push(limits);
@@ -9041,13 +9198,14 @@ function specToR(spec, labels = {}) {
     if (line) lines.push(`  ${line}`);
   }
   if (spec.facet) {
-    const { wrap, row, col, ncol, nrow, freeX, freeY, heights } = spec.facet;
+    const { wrap, row, col, ncol, nrow, freeX, freeY, heights, strips, rowAxes } = spec.facet;
     const scalesArg = freeX && freeY ? ', scales = "free"' : freeX ? ', scales = "free_x"' : freeY ? ', scales = "free_y"' : "";
+    const extArgs = (strips === false ? ", strip = FALSE" : "") + (rowAxes && rowAxes.length > 0 ? `, row_axes = ${rValue(rowAxes)}` : "");
     if (wrap) {
       const extra = ncol ? `, ncol = ${ncol}` : nrow ? `, nrow = ${nrow}` : "";
-      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg})`);
+      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg}${extArgs})`);
     } else if (row || col) {
-      lines.push(`  facet_grid(${row ? rName(row) : "."} ~ ${col ? rName(col) : "."}${scalesArg})`);
+      lines.push(`  facet_grid(${row ? rName(row) : "."} ~ ${col ? rName(col) : "."}${scalesArg}${extArgs})`);
     }
     if (heights && heights.length > 0 && (wrap || row || col)) {
       lines.push(`  ggh4x::force_panelsizes(rows = c(${heights.join(", ")}))`);
@@ -37690,9 +37848,9 @@ var GEOM_OPTIONS = [
   "varwidth",
   "naRm"
 ];
-var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels"];
-var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY", "heights"];
-var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize"];
+var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels", "dateBreaks", "labelUnit", "labelColor", "position"];
+var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY", "heights", "strips", "rowAxes"];
+var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize", "fontFamily", "gridX", "gridY", "gridMinor", "ticks"];
 var THEME_PRESETS = ["grey", "minimal", "dark"];
 var options = (labels, type2) => labels.map((label) => ({ label, type: type2 }));
 function createGgpbiCompletions(fields = []) {
@@ -37829,7 +37987,13 @@ var R_NAMED_ARGS = [
   "labels",
   "subtitle",
   "trans",
-  "rows"
+  "rows",
+  "position",
+  "date_breaks",
+  "label_unit",
+  "label_colour",
+  "strip",
+  "row_axes"
 ];
 var rApply = (name2) => /^[a-zA-Z.][\w.]*$/.test(name2) ? name2 : `\`${name2.replace(/`/g, "")}\``;
 function createGgplot2Completions(fields = []) {
@@ -38993,7 +39157,7 @@ function estimateYTickLabelWidth(spec, data, theme2) {
     if (!isFinite(lo) || !isFinite(hi)) return 0;
     if (yCfg.min !== void 0) lo = yCfg.min;
     if (yCfg.max !== void 0) hi = yCfg.max;
-    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels);
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
   }
   let maxWidth = 0;
   for (const label of labels) {
@@ -39005,14 +39169,25 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
   const width = spec.width ?? 600;
   const height = spec.height ?? 400;
   let baseMargin = margin ?? theme2.margin;
+  let yAxisRoom = 0;
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
   if (!margin) {
+    const yTitle = !isBlankLabel(spec.yLabel);
     const labelWidth = estimateYTickLabelWidth(spec, spec.data ?? [], theme2);
+    const titleRoom = yTitle ? theme2.axisTitleSize + theme2.axisTitleMargin : 0;
     const required = Math.ceil(
-      theme2.halfLine * 2 + theme2.axisTitleSize + theme2.axisTitleMargin + labelWidth + theme2.tickLength + AXIS_TICK_PADDING
+      theme2.halfLine * 2 + titleRoom + labelWidth + theme2.tickLength + AXIS_TICK_PADDING
     );
     const cap = Math.floor(width * 0.4);
-    const left2 = Math.max(theme2.margin.left, Math.min(required, cap));
-    baseMargin = { ...theme2.margin, left: left2 };
+    const floor = yTitle ? theme2.margin.left : Math.round(theme2.halfLine * 2);
+    const side = Math.max(floor, Math.min(required, cap));
+    yAxisRoom = Math.max(0, side - theme2.halfLine * 2 - titleRoom);
+    const xTitle = !isBlankLabel(spec.xLabel);
+    const xAxis = drawsBottomXAxis(spec);
+    const bottom2 = xTitle && xAxis ? theme2.margin.bottom : Math.round(
+      theme2.halfLine * 2 + (xAxis ? theme2.axisTextSize + theme2.halfLine / 2 : 0) + (xTitle ? theme2.axisTitleSize + theme2.halfLine / 2 : 0)
+    );
+    baseMargin = yRight ? { ...theme2.margin, left: Math.round(theme2.halfLine * 2), right: side, bottom: bottom2 } : { ...theme2.margin, left: side, bottom: bottom2 };
   }
   const effectiveMargin = {
     ...baseMargin,
@@ -39025,8 +39200,18 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
     height,
     innerWidth: width - effectiveMargin.left - effectiveMargin.right,
     innerHeight: height - effectiveMargin.top - effectiveMargin.bottom,
-    margin: effectiveMargin
+    margin: effectiveMargin,
+    yAxisRoom
   };
+}
+function isBlankLabel(label) {
+  return label !== void 0 && label.trim() === "";
+}
+function drawsBottomXAxis(spec) {
+  const facet = spec.facet;
+  if (!facet?.rowAxes || !(facet.wrap || facet.row || facet.col)) return true;
+  const { nRows } = facetDims(facet, spec.data ?? []);
+  return parseRowAxes(facet.rowAxes[nRows - 1])?.x ?? true;
 }
 function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   const notes = [];
@@ -39282,9 +39467,20 @@ function createSvg(container, built) {
   }
   const { width, height, margin } = built.layout;
   const chartLabel = [built.spec.xLabel, built.spec.yLabel].filter(Boolean).join(" vs ") || "Chart";
-  const svg = select_default2(container).append("svg").attr("width", width).attr("height", height).attr("class", "ggpbi-visual").attr("role", "img").attr("aria-label", chartLabel).style("pointer-events", "none");
+  const svg = select_default2(container).append("svg").attr("width", width).attr("height", height).attr("class", "ggpbi-visual").attr("role", "img").attr("aria-label", chartLabel).style("pointer-events", "none").style("font-family", built.theme.fontFamily);
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
   return { svg, g };
+}
+function axisOptions(xCfg, yCfg) {
+  return {
+    yPosition: yCfg.position,
+    xLabelUnit: xCfg.labelUnit,
+    yLabelUnit: yCfg.labelUnit,
+    xLabelColor: xCfg.labelColor,
+    yLabelColor: yCfg.labelColor,
+    xDateBreaks: xCfg.dateBreaks,
+    yDateBreaks: yCfg.dateBreaks
+  };
 }
 function renderFaceted(g, svg, built) {
   const { spec, data, theme: theme2, scales } = built;
@@ -39292,27 +39488,10 @@ function renderFaceted(g, svg, built) {
   const facet = spec.facet;
   const rowField = facet.row;
   const colField = facet.col;
-  const levelSort = (a, b) => {
-    const na = Number(a);
-    const nb = Number(b);
-    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-    return a.localeCompare(b);
-  };
   const wrapField = facet.wrap;
-  const wrapLevels = wrapField ? Array.from(new Set(data.map((d) => String(d[wrapField])))).sort(levelSort) : [];
-  const rowLevels = !wrapField && rowField ? Array.from(new Set(data.map((d) => String(d[rowField])))).sort(levelSort) : [""];
-  const colLevels = !wrapField && colField ? Array.from(new Set(data.map((d) => String(d[colField])))).sort(levelSort) : [""];
-  let nRows;
-  let nCols;
-  if (wrapField) {
-    const n = wrapLevels.length;
-    nCols = facet.ncol ?? (facet.nrow ? Math.ceil(n / facet.nrow) : Math.ceil(Math.sqrt(n)));
-    nCols = Math.max(1, Math.min(nCols, n));
-    nRows = Math.ceil(n / nCols);
-  } else {
-    nRows = Math.max(1, rowLevels.length);
-    nCols = Math.max(1, colLevels.length);
-  }
+  const { wrapLevels, rowLevels, colLevels, nRows, nCols } = facetDims(facet, data);
+  const showStrips = facet.strips !== false;
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
   const xCfg = parseScaleConfig(spec.scales?.x);
   const yCfg = parseScaleConfig(spec.scales?.y);
   const { xType, yType } = scales;
@@ -39395,21 +39574,20 @@ function renderFaceted(g, svg, built) {
     } else {
       const [lo, hi] = scale.domain().map(Number);
       const ticks2 = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? extendedBreaks(lo, hi, theme2.nBreaks).filter((t2) => t2 >= lo && t2 <= hi) : [];
-      labels = formatBreaksAs(ticks2, yCfg.labels, spec.format);
+      labels = formatBreaksAs(ticks2, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
     }
     return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme2.axisTextSize)), 0);
   };
+  const outerCol = yRight ? nCols - 1 : 0;
+  const rowAxes = (facet.rowAxes ?? []).map(parseRowAxes);
   const colLabelWidth = Array.from({ length: nCols }, () => 0);
   for (const cell of cells) {
-    if (cell.c === 0 || facet.freeY) {
+    if (cell.c === outerCol || facet.freeY || rowAxes[cell.r]?.y) {
       colLabelWidth[cell.c] = Math.max(colLabelWidth[cell.c], yLabelWidth(cell));
     }
   }
   const tickRoom = theme2.tickLength + AXIS_TICK_PADDING;
-  const reservedLeft = Math.max(
-    0,
-    built.layout.margin.left - (theme2.halfLine * 2 + theme2.axisTitleSize + theme2.axisTitleMargin)
-  );
+  const reservedLeft = built.layout.yAxisRoom ?? 0;
   const present = new Set(cells.map((cell) => `${cell.r},${cell.c}`));
   const stripH = Math.round(theme2.axisTextSize + 1.6 * theme2.halfLine);
   const grid = layoutFacetGrid({
@@ -39420,8 +39598,10 @@ function renderFaceted(g, svg, built) {
     innerHeight: innerHeight2,
     freeX: !!facet.freeX,
     freeY: !!facet.freeY,
-    stripAbove: (r) => !!wrapField || !!colField && r === 0,
-    stripRight: !wrapField && !!rowField,
+    stripAbove: (r) => showStrips && (!!wrapField || !!colField && r === 0),
+    stripRight: showStrips && !wrapField && !!rowField,
+    yAxisSide: yRight ? "right" : "left",
+    rowAxes,
     heights: facet.heights,
     yAxisWidth: (c) => colLabelWidth[c] + tickRoom,
     reservedLeft,
@@ -39442,13 +39622,13 @@ function renderFaceted(g, svg, built) {
   for (const pos of grid) {
     const cell = cellAt.get(`${pos.r},${pos.c}`);
     const facetG = g.append("g").attr("class", "ggpbi-facet").attr("transform", `translate(${pos.x},${pos.y})`);
-    if (wrapField) {
+    if (showStrips && wrapField) {
       stripText(facetG, "ggpbi-facet-strip-wrap", pos.width / 2, -stripH / 2, cell.label.wrap);
     }
-    if (!wrapField && colField && pos.r === 0) {
+    if (showStrips && !wrapField && colField && pos.r === 0) {
       stripText(facetG, "ggpbi-facet-strip-col", pos.width / 2, -stripH / 2, cell.label.col);
     }
-    if (!wrapField && rowField && pos.c === nCols - 1) {
+    if (showStrips && !wrapField && rowField && pos.c === nCols - 1) {
       stripText(facetG, "ggpbi-facet-strip-row", pos.width + stripH / 2, pos.height / 2, cell.label.row, true);
     }
     const panelG = facetG.append("g").attr("class", "ggpbi-facet-panel");
@@ -39470,6 +39650,7 @@ function renderFaceted(g, svg, built) {
       format: spec.format,
       xDateFormat: xCfg.dateLabels,
       yDateFormat: yCfg.dateLabels,
+      ...axisOptions(xCfg, yCfg),
       showXAxis: pos.showXAxis,
       showYAxis: pos.showYAxis
     });
@@ -39482,15 +39663,23 @@ function renderLabelsAndLegend(g, built) {
   if (subtitle) {
     g.append("text").attr("class", "ggpbi-subtitle").attr("x", 0).attr("y", -theme2.halfLine).attr("text-anchor", "start").attr("font-size", `${theme2.plotCaptionSize}px`).attr("fill", theme2.axisTextColor).text(subtitle);
   }
-  if (spec.xLabel) {
-    g.append("text").attr("class", "ggpbi-axis-label-x").attr("x", innerWidth / 2).attr("y", innerHeight2 + theme2.margin.bottom - theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.xLabel);
+  if (spec.xLabel && !isBlankLabel(spec.xLabel)) {
+    g.append("text").attr("class", "ggpbi-axis-label-x").attr("x", innerWidth / 2).attr("y", innerHeight2 + layout.margin.bottom - theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.xLabel);
   }
-  if (spec.yLabel) {
-    g.append("text").attr("class", "ggpbi-axis-label-y").attr("transform", "rotate(-90)").attr("x", -innerHeight2 / 2).attr("y", -layout.margin.left + theme2.axisTitleSize + theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.yLabel);
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
+  const rightAxisRoom = yRight ? layout.margin.right - legend.width - theme2.halfLine * 2 : 0;
+  if (spec.yLabel && !isBlankLabel(spec.yLabel)) {
+    const title = g.append("text").attr("class", "ggpbi-axis-label-y").attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.yLabel);
+    if (yRight) {
+      const x2 = innerWidth + rightAxisRoom - theme2.axisTitleSize * 0.2;
+      title.attr("transform", `translate(${x2},${innerHeight2 / 2}) rotate(90)`).attr("x", 0).attr("y", 0);
+    } else {
+      title.attr("transform", "rotate(-90)").attr("x", -innerHeight2 / 2).attr("y", -layout.margin.left + theme2.axisTitleSize + theme2.axisTitleMargin);
+    }
   }
   const showLegend = spec.showLegend !== false;
   if (showLegend && legend.entries.length > 0 && spec.aes.color) {
-    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map((l) => l.geom), theme2, innerWidth);
+    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map((l) => l.geom), theme2, innerWidth + rightAxisRoom);
   }
 }
 function renderWithState(container, spec, margin) {
@@ -39519,7 +39708,8 @@ function renderWithState(container, spec, margin) {
       yLabelFormat: parseScaleConfig(built.spec.scales?.y).labels,
       format: built.spec.format,
       xDateFormat: parseScaleConfig(built.spec.scales?.x).dateLabels,
-      yDateFormat: parseScaleConfig(built.spec.scales?.y).dateLabels
+      yDateFormat: parseScaleConfig(built.spec.scales?.y).dateLabels,
+      ...axisOptions(parseScaleConfig(built.spec.scales?.x), parseScaleConfig(built.spec.scales?.y))
     });
   }
   renderLabelsAndLegend(g, built);
@@ -40101,6 +40291,18 @@ function mapScale(call, patch) {
       cfg.dateLabels = arg.value;
       continue;
     }
+    if (arg.name === "date_breaks") {
+      cfg.dateBreaks = arg.value;
+      continue;
+    }
+    if (arg.name === "label_unit") {
+      cfg.labelUnit = arg.value;
+      continue;
+    }
+    if (arg.name === "label_colour" || arg.name === "label_color") {
+      cfg.labelColor = arg.value;
+      continue;
+    }
     cfg[arg.name] = arg.value;
   }
   patch.scales = { ...patch.scales ?? {}, [axis2]: cfg };
@@ -40137,6 +40339,19 @@ function mapFacet(call, patch) {
     }
     if (arg.name === "ncol" || arg.name === "nrow") {
       facet[arg.name] = v;
+      continue;
+    }
+    if (arg.name === "strip") {
+      if (typeof v !== "boolean") throw new ParseError2("strip takes TRUE or FALSE", arg.line);
+      if (v === false) facet.strips = false;
+      continue;
+    }
+    if (arg.name === "row_axes") {
+      const entries = (Array.isArray(v) ? v : [v]).map(String);
+      if (!entries.every((e) => parseRowAxes(e) !== void 0)) {
+        throw new ParseError2('row_axes takes "x", "y", "xy" or "none" per row, e.g. c("xy", "none")', arg.line);
+      }
+      facet.rowAxes = entries;
       continue;
     }
     if (arg.name === "scales") {
@@ -40306,8 +40521,14 @@ var THEME_OPTION_MAP = {
   gridColor: { prop: "gridlineColor", map: (v) => typeof v === "string" ? fill(v) : void 0 },
   ink: { prop: "ink", map: (v) => typeof v === "string" ? fill(v) : void 0 },
   paper: { prop: "paper", map: (v) => typeof v === "string" ? fill(v) : void 0 },
-  baseSize: { prop: "baseSize", map: (v) => typeof v === "number" ? v : void 0 }
+  baseSize: { prop: "baseSize", map: (v) => typeof v === "number" ? v : void 0 },
+  gridX: { prop: "gridX", map: (v) => typeof v === "boolean" ? v : void 0 },
+  gridY: { prop: "gridY", map: (v) => typeof v === "boolean" ? v : void 0 },
+  gridMinor: { prop: "gridMinor", map: (v) => typeof v === "boolean" ? v : void 0 },
+  ticks: { prop: "ticks", map: (v) => typeof v === "boolean" ? v : void 0 },
+  fontFamily: { prop: "fontFamily", map: (v) => typeof v === "string" ? v : void 0 }
 };
+var LABEL_UNITS = /* @__PURE__ */ new Set(["none", "thousands", "millions", "billions"]);
 var THEME_HOST_KEYS = /* @__PURE__ */ new Set(["colorPalette", "isHighContrast"]);
 function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
   const instances = [];
@@ -40370,7 +40591,15 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
   for (let i = cardLayers.length; i < liveCardLayers; i++) {
     add(`layer${i + 1}`, { enabled: false });
   }
-  const SCALE_PROP = { type: "type", labels: "labelFormat", dateLabels: "dateFormat" };
+  const SCALE_PROP = {
+    type: "type",
+    labels: "labelFormat",
+    dateLabels: "dateFormat",
+    labelUnit: "labelUnit",
+    labelColor: "labelColor",
+    dateBreaks: "dateBreaks",
+    position: "position"
+  };
   const scalePatch = (axis2, objectName) => {
     const cfg = patch.scales?.[axis2];
     const properties = {};
@@ -40379,13 +40608,18 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
       if (key === "type" && SCALE_TYPES.has(value)) properties.type = value;
       else if (key === "labels" && LABEL_FORMATS.has(value)) properties.labelFormat = value;
       else if (key === "dateLabels" && DATE_FORMATS.has(value)) properties.dateFormat = value;
+      else if (key === "labelUnit" && LABEL_UNITS.has(value)) properties.labelUnit = value;
+      else if (key === "labelColor" && typeof value === "string") properties.labelColor = fill(value);
+      else if (key === "dateBreaks" && typeof value === "string") properties.dateBreaks = value;
+      else if (key === "position" && axis2 === "y" && (value === "left" || value === "right")) properties.position = value;
       else residual = true;
     }
     const liveCfg = live.scales?.[axis2];
     const liveEntries = liveCfg === void 0 ? {} : typeof liveCfg === "string" ? { type: liveCfg } : liveCfg;
     for (const [key, prop] of Object.entries(SCALE_PROP)) {
       if (liveEntries[key] === void 0 || key in entries) continue;
-      revert(properties, objectName, prop);
+      if (prop === "dateBreaks") properties.dateBreaks = "";
+      else revert(properties, objectName, prop);
     }
     add(objectName, properties);
   };
@@ -40401,7 +40635,9 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
       ncol: "columns",
       freeX: "freeX",
       freeY: "freeY",
-      heights: "heights"
+      heights: "heights",
+      strips: "strips",
+      rowAxes: "rowAxes"
     };
     const properties = {};
     if (patch.facet) {
@@ -40411,6 +40647,9 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
         else if (key === "freeY" && typeof value === "boolean") properties.freeY = value;
         else if (key === "heights" && Array.isArray(value) && value.length > 0 && value.every((h) => typeof h === "number" && h > 0)) {
           properties.heights = value.join(",");
+        } else if (key === "strips" && typeof value === "boolean") properties.strips = value;
+        else if (key === "rowAxes" && Array.isArray(value) && value.length > 0 && value.every((e) => parseRowAxes(e) !== void 0)) {
+          properties.rowAxes = value.join(",");
         } else if (key === "wrap" || key === "row" || key === "col") {
           const liveFacet2 = live.facet;
           if (liveFacet2?.[key] !== value) residual = true;
@@ -40423,7 +40662,8 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     for (const [key, prop] of Object.entries(FACET_PROP)) {
       if (liveFacet[key] === void 0) continue;
       if (patch.facet && key in patch.facet) continue;
-      if (prop === "heights") properties.heights = "";
+      if (prop === "heights" || prop === "rowAxes") properties[prop] = "";
+      else if (prop === "strips") properties.strips = true;
       else revert(properties, "facet", prop);
     }
     add("facet", properties);

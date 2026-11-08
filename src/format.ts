@@ -181,6 +181,68 @@ export function formatCompact(breaks: number[], opts: FormatOptions = {}): strin
   return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
 }
 
+/** A fixed display unit for every label of an axis. */
+export type LabelUnit = 'none' | 'thousands' | 'millions' | 'billions';
+
+const UNIT_SCALE: Record<Exclude<LabelUnit, 'none'>, number> = {
+  thousands: 1e3,
+  millions: 1e6,
+  billions: 1e9,
+};
+const UNIT_FALLBACK: Record<Exclude<LabelUnit, 'none'>, string> = {
+  thousands: 'K',
+  millions: 'M',
+  billions: 'B',
+};
+
+/**
+ * The locale's short suffix for a unit, as `Intl` writes it after the
+ * number ("M", " Mio.", "L" …). Falls back to K/M/B where the locale has
+ * no short form (German thousands).
+ */
+function unitSuffix(unit: Exclude<LabelUnit, 'none'>, locale?: string): string {
+  try {
+    const parts = new Intl.NumberFormat(locale, { notation: 'compact', compactDisplay: 'short' })
+      .formatToParts(UNIT_SCALE[unit]);
+    const i = parts.findIndex(p => p.type === 'compact');
+    if (i >= 0) {
+      // Keep the literal between number and suffix (German "1 Mio.").
+      const before = i > 0 && parts[i - 1].type === 'literal' ? parts[i - 1].value : '';
+      // Only when the locale's unit is the one asked for: "1K" for 1e3,
+      // not "10L" for a lakh-counting locale.
+      const integer = parts.filter(p => p.type === 'integer').map(p => p.value).join('');
+      if (integer === '1') return before + parts[i].value;
+    }
+  } catch {
+    // unknown locale — fall through
+  }
+  return UNIT_FALLBACK[unit];
+}
+
+/**
+ * Every label in one fixed unit — Power BI's display units, R's
+ * `label_number(scale = 1e-6, suffix = "M")`: 0, 500 M, 1.5 B read "0M",
+ * "500M", "1,500M". Decimals come from the scaled breaks; `grouping`
+ * adds the locale's separators ("1,500M").
+ */
+export function formatInUnit(
+  breaks: number[],
+  unit: Exclude<LabelUnit, 'none'>,
+  opts: FormatOptions = {},
+  grouping = false,
+): string[] {
+  const scale = UNIT_SCALE[unit];
+  const scaled = breaks.map(v => v / scale);
+  const decimals = breakDecimals(scaled);
+  const nf = intl(opts.locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: grouping,
+  });
+  const suffix = unitSuffix(unit, opts.locale);
+  return scaled.map(v => nf.format(v) + suffix);
+}
+
 /** Currency with the locale's own symbol placement and spacing. */
 export function formatCurrency(breaks: number[], opts: FormatOptions = {}): string[] {
   const decimals = Math.min(breakDecimals(breaks), 2);

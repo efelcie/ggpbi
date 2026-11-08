@@ -390,7 +390,7 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `type` | enum | `auto` | see [Geom Types](#geom-types) | yes | Geom type |
 | `yField` | enum | `auto` | `auto`, `y1`, `y2`, `y3` | yes | Which Y field this layer uses |
 | `alpha` | number | `0.85` | 0–1 | yes | Transparency |
-| `size` | number | `4` | 1–40 | yes | Point size / line width / font size. The default `4` means "auto": each geom keeps its own default (point 4, line 2, text 12, pointrange 1) — any other value overrides it |
+| `size` | number | `4` | 1–40 | yes | Point size / line width / font size. The default `4` means "auto": each geom keeps its own default (point 4, line 2, text 12, pointrange 1) — any other value overrides it. On an **area** layer it draws the upper edge as a line of that width in the layer colour (ggplot2 `geom_area(colour =, linewidth =)`); `alpha` then thins only the fill |
 | `fill` | color | `""` (auto) | any color | yes | Override color (ignores aes.color) |
 | `lineStyle` | enum | `solid` | see [Line Types](#line-types) | yes | Line dash pattern |
 | `position` | enum | `identity` | see [Position Types](#position-types) | yes | Position adjustment |
@@ -423,6 +423,13 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `label` | text | `""` (field name) | any string | Axis title |
 | `labelFormat` | enum | `auto` | `auto`, `thousands`, `compact`, `currency`, `percent` | Number format for the tick labels. `auto` is ggplot2’s plain look (no group separators), `thousands` groups digits. Separators, symbols and compact suffixes follow the report locale — `1200000` renders as `1.2M` (en) or `1,2 Mio.` (de). Decimals come from the breaks (`scales::precision()`), the same for every label of a unit: `7.0M`, `7.5M` |
 | `dateFormat` | enum | `auto` | `auto`, `year`, `monthYear`, `monthDay`, `date`, `dateTime` | Granularity of a time axis. `auto` follows the tick spacing; month names always come from the report locale |
+| `labelUnit` | enum | `none` | `none`, `thousands`, `millions`, `billions` | One fixed display unit for every label, like Power BI's display units: `0M`, `500M`, `1,500M` (R `label_number(scale = 1e-6, suffix = "M")`). Applies to `auto` and `thousands` (which groups digits); `compact` picks its own units |
+| `dateBreaks` | text | `""` | e.g. `6 months`, `1 year`, `3 months`, `2 weeks` | Fixed spacing of a time axis's labels, ggplot2 `date_breaks`; empty = automatic |
+| `labelColor` | color | `""` | any colour | Tick label colour (ggplot2 `axis.text = element_text(colour =)`); empty = theme |
+| `position` | enum | `left` | `left`, `right` | **scaleY only.** Side of the y axis, ggplot2 `position = "right"` |
+
+A `label` of a single space (`"' '"`) removes the axis title *and its room*
+— ggplot2's `labs(y = NULL)`. An empty label falls back to the field name.
 
 ---
 
@@ -453,6 +460,11 @@ The legend appears automatically when `color` aesthetic is mapped.
 | `ink` | color | `#333333` | any color | Text color (axis labels, titles) |
 | `paper` | color | `#FFFFFF` | any color | Outer background (margins) |
 | `baseSize` | number | `11` | 6–72 | Base font size in px. Pages laid out at 3× device pixels (mobile layouts) need three times the intended size — `40` reads like 13 px on the phone |
+| `fontFamily` | text | `""` | CSS font list | Font for every text (ggplot2 `base_family`); empty = Power BI's Segoe UI |
+| `gridX` | bool | `true` | true/false | Vertical grid lines, major and minor (`panel.grid.major.x`) |
+| `gridY` | bool | `true` | true/false | Horizontal grid lines, major and minor (`panel.grid.major.y`) |
+| `gridMinor` | bool | `true` | true/false | Minor grid lines between the breaks (`panel.grid.minor`) |
+| `ticks` | bool | `true` | true/false | Axis tick marks (`axis.ticks`) |
 
 #### Theme Presets
 
@@ -495,6 +507,8 @@ A field in the **Facet** well becomes `facet_wrap`: a roughly square grid
 | `freeX` | bool | `false` | true/false | Each panel scales X to its own data (`scales = "free_x"`) |
 | `freeY` | bool | `false` | true/false | Same for the Y axis |
 | `heights` | text | `""` | e.g. `4,1` | Relative row heights, recycled over the rows; empty = equal rows. `4,1` makes a flat second row under a tall first one (patchwork `heights`, `ggh4x::force_panelsizes(rows = c(4, 1))`) |
+| `strips` | bool | `true` | true/false | Strip labels above the panels; `false` removes them and their room (`strip.text = element_blank()`) |
+| `rowAxes` | text | `""` | e.g. `xy,none` | Axes per panel row: `x`, `y`, `xy` or `none`, comma-separated. `xy,none` puts the month labels between a line panel and a flat column panel that shows no scale. Empty = outer axes, like ggplot2 |
 
 Each layer draws the rows where its own Y is non-blank, panels come from
 every layer, and a panel's Y scale trains on all of its layers. The x axis
@@ -2018,6 +2032,15 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
 | `facet.columns` | `facet_wrap(ncol=)` | Grid columns |
 | `facet.freeX` / `facet.freeY` | `facet_wrap(scales=)` | `"free_x"`, `"free_y"`, `"free"` |
 | `facet.heights` | `ggh4x::force_panelsizes(rows=)` | Relative row heights (patchwork `heights`) |
+| `facet.strips` | `theme(strip.text = element_blank())` | `false` = no strip labels |
+| `facet.rowAxes` | — (ggpbi) | Axes per row; R code view: `facet_wrap(row_axes = c("xy", "none"))` |
+| `scaleY.position` | `scale_y_continuous(position=)` | `"right"` |
+| `scaleX.labelUnit` / `scaleY.labelUnit` | `label_number(scale=, suffix=)` | Power BI display units |
+| `scaleX.dateBreaks` | `scale_x_date(date_breaks=)` | Label spacing on a time axis |
+| `scaleX.labelColor` / `scaleY.labelColor` | `theme(axis.text.x/y = element_text(colour=))` | Tick label colour |
+| `theme.gridX` / `theme.gridY` / `theme.gridMinor` | `panel.grid.major.x/y`, `panel.grid.minor` | Grid switches |
+| `theme.ticks` | `axis.ticks` | Tick marks |
+| `theme.fontFamily` | `base_family` | Font |
 
 ---
 

@@ -359,6 +359,32 @@ ggpbi()
     note: 'Each layer draws the rows where its own value is present, so the line and the bars land in their own panels; `heights` makes the bar panel flat. One shared x axis under the bottom panel, as in ggplot2.',
   },
   {
+    id: 'power-bi-look',
+    title: 'The Power BI look',
+    r: `ggplot(economics, aes(date, unemploy * 1000)) +
+  geom_area(fill = "#416B84", alpha = 0.15, colour = "#416B84", linewidth = 0.7) +
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+  scale_y_continuous(position = "right",
+                     labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+  theme_minimal(base_family = "Segoe UI") +
+  theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank(),
+        axis.ticks = element_blank()) +
+  labs(x = NULL, y = NULL)`,
+    code: `ggpbi()
+  .data(economics.map((d) => ({ ...d, persons: d.unemploy * 1000 })))
+  .aes({ x: 'date', y: 'persons' })
+  .geom('area', { color: '#416B84', alpha: 0.15, size: 2 })
+  .scale({
+    x: { dateLabels: 'year', dateBreaks: '10 years', labelColor: '#8A8886' },
+    y: { position: 'right', labelUnit: 'millions', labelColor: '#8A8886' },
+  })
+  .theme({ ...themeMinimal(), gridColor: '#E1DFDD', gridX: false, gridMinor: false, ticks: false })
+  .labels(' ', ' ')
+  .size(640, 340)
+  .renderTo(el);`,
+    note: 'Right-hand axis in fixed display units (`0M`, `4M`, `8M`, `12M`), a light horizontal grid, no ticks, no titles, the report font — a native Power BI line chart, built from ggplot2 vocabulary.',
+  },
+  {
     id: 'text-labels',
     title: 'Text labels',
     r: `mtcars |>

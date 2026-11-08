@@ -16,7 +16,26 @@ import type { PanelSharedState } from './scene-types';
 import { renderSceneNodes } from './scene-renderer';
 import type { LabelFormat } from './types';
 import { extendedBreaks, formatBreaksAs, minorBreaks } from './breaks';
-import { formatDates, type FormatOptions, type DateFormat } from './format';
+import { formatDates, type FormatOptions, type DateFormat, type LabelUnit } from './format';
+
+/**
+ * ggplot2's `date_breaks` ("6 months", "1 year", "2 weeks") as a d3
+ * interval. Undefined for anything it cannot read — d3 picks then.
+ */
+export function parseDateBreaks(text: string | undefined): d3.TimeInterval | undefined {
+  if (!text) return undefined;
+  const m = /^\s*(\d+)?\s*(day|week|month|quarter|year)s?\s*$/i.exec(text);
+  if (!m) return undefined;
+  const n = Math.max(1, Number(m[1] ?? 1));
+  switch (m[2].toLowerCase()) {
+    case 'day': return d3.timeDay.every(n) ?? undefined;
+    case 'week': return d3.timeWeek.every(n) ?? undefined;
+    case 'month': return d3.timeMonth.every(n) ?? undefined;
+    case 'quarter': return d3.timeMonth.every(3 * n) ?? undefined;
+    case 'year': return d3.timeYear.every(n) ?? undefined;
+  }
+  return undefined;
+}
 
 // Shared clip-path counter (monotonic, no Math.random for Power BI compat)
 let clipCounter = 0;
@@ -35,7 +54,7 @@ function ggBreaks(
   scale: any,
   nBreaks: number,
   labelFormat?: LabelFormat,
-  fmt: FormatOptions & { dateFormat?: DateFormat } = {},
+  fmt: FormatOptions & { dateFormat?: DateFormat; dateBreaks?: string; unit?: LabelUnit } = {},
 ): { ticks: Array<number | Date>; labels: string[] } | undefined {
   // Band/ordinal scales should use their domain values directly.
   // Running the continuous break algorithm on band domains can produce
@@ -51,7 +70,8 @@ function ggBreaks(
   // locale. d3's own default is English whatever the report language is.
   if (dom[0] instanceof Date || dom[1] instanceof Date) {
     if (typeof scale.ticks !== 'function') return undefined;
-    const dateTicks = scale.ticks(nBreaks) as Date[];
+    const interval = parseDateBreaks(fmt.dateBreaks);
+    const dateTicks = (interval ? scale.ticks(interval) : scale.ticks(nBreaks)) as Date[];
     if (dateTicks.length === 0) return undefined;
     return { ticks: dateTicks, labels: formatDates(dateTicks, fmt.dateFormat, fmt) };
   }
@@ -152,6 +172,17 @@ export interface PanelInput {
   showXAxis?: boolean;
   /** Draw the y axis. Default true. */
   showYAxis?: boolean;
+  /** Which side the y axis sits on (ggplot2 position = "right"). */
+  yPosition?: 'left' | 'right';
+  /** Fixed display units for the tick labels (Power BI display units). */
+  xLabelUnit?: LabelUnit;
+  yLabelUnit?: LabelUnit;
+  /** Tick label colours; default the theme's axis text colour. */
+  xLabelColor?: string;
+  yLabelColor?: string;
+  /** Fixed spacing of time-axis breaks, ggplot2's date_breaks ("6 months"). */
+  xDateBreaks?: string;
+  yDateBreaks?: string;
 }
 
 /**
@@ -172,9 +203,9 @@ export function renderPanel(ctx: PanelInput): void {
 
   // Breaks via Wilkinson Extended algorithm (like ggplot2)
   const xBreaks = ggBreaks(xScale, theme.nBreaks, ctx.xLabelFormat,
-    { ...ctx.format, dateFormat: ctx.xDateFormat });
+    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit });
   const yBreaks = ggBreaks(yScale, theme.nBreaks, ctx.yLabelFormat,
-    { ...ctx.format, dateFormat: ctx.yDateFormat });
+    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit });
 
   const isBandX = typeof (xScale as any).bandwidth === 'function';
   const xTicks = isBandX ? [] : (xBreaks?.ticks ?? ((xScale as any).ticks ? (xScale as any).ticks(theme.nBreaks) : []));
@@ -183,8 +214,11 @@ export function renderPanel(ctx: PanelInput): void {
   // Minor grid lines (ggplot2 panel.grid.minor: rel(0.5) linewidth)
   const yDom = (yScale as any).domain?.() as [number, number] | undefined;
   const xDom = (xScale as any).domain?.() as [number, number] | undefined;
-  const yMinor = yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
-  const xMinor = isBandX ? [] : (xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : []);
+  // Grid switches (ggplot2 panel.grid.major.x / .y, panel.grid.minor):
+  // a direction switched off loses its major and minor lines.
+  const yMinor = theme.gridY && theme.gridMinor && yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
+  const xMinor = isBandX || !theme.gridX || !theme.gridMinor
+    ? [] : (xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : []);
 
   for (const tick of yMinor) {
     panelG.append('line')
@@ -202,14 +236,14 @@ export function renderPanel(ctx: PanelInput): void {
   }
 
   // Major grid lines (ggplot2 panel.grid.major)
-  for (const tick of yTicks) {
+  for (const tick of theme.gridY ? yTicks : []) {
     panelG.append('line')
       .attr('class', 'ggpbi-grid')
       .attr('x1', 0).attr('x2', innerWidth)
       .attr('y1', (yScale as any)(tick)).attr('y2', (yScale as any)(tick))
       .attr('stroke', theme.gridColor).attr('stroke-width', theme.baseLineSize);
   }
-  for (const tick of xTicks) {
+  for (const tick of theme.gridX ? xTicks : []) {
     panelG.append('line')
       .attr('class', 'ggpbi-grid')
       .attr('y1', 0).attr('y2', innerHeight)
@@ -241,7 +275,8 @@ export function renderPanel(ctx: PanelInput): void {
     xAxis.ticks(theme.nBreaks);
   }
 
-  const yAxis = d3.axisLeft(yScale as d3.AxisScale<d3.AxisDomain>)
+  const yRight = ctx.yPosition === 'right';
+  const yAxis = (yRight ? d3.axisRight : d3.axisLeft)(yScale as d3.AxisScale<d3.AxisDomain>)
     .tickSize(theme.tickLength)
     .tickSizeOuter(0);
   if (yBreaks) {
@@ -259,21 +294,25 @@ export function renderPanel(ctx: PanelInput): void {
     .call(xAxis);
   if (ctx.showXAxis === false) xAxisGroup.remove();
 
+  // d3 stamps font-family="sans-serif" on every axis; the theme's family wins.
+  xAxisGroup.attr('font-family', theme.fontFamily);
   xAxisGroup.selectAll('text')
     .style('font-size', `${theme.axisTextSize}px`)
-    .style('fill', theme.axisTextColor);
+    .style('fill', ctx.xLabelColor ?? theme.axisTextColor);
   xAxisGroup.selectAll('.tick line')
     .style('stroke', theme.axisTickColor);
   xAxisGroup.select('.domain').style('display', 'none');
 
   const yAxisGroup = panelG.append('g')
     .attr('class', 'ggpbi-axis-y')
+    .attr('font-family', theme.fontFamily)
     .call(yAxis);
+  if (yRight) yAxisGroup.attr('transform', `translate(${innerWidth},0)`);
   if (ctx.showYAxis === false) yAxisGroup.remove();
 
   yAxisGroup.selectAll('text')
     .style('font-size', `${theme.axisTextSize}px`)
-    .style('fill', theme.axisTextColor);
+    .style('fill', ctx.yLabelColor ?? theme.axisTextColor);
   yAxisGroup.selectAll('.tick line')
     .style('stroke', theme.axisTickColor);
   yAxisGroup.select('.domain').style('display', 'none');

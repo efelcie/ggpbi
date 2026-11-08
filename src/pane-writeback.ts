@@ -19,6 +19,7 @@
  */
 import type { PlotSpec } from './types';
 import { FUNC, type CodePatch } from './code-parse';
+import { parseRowAxes } from './facet-layout';
 
 export interface PersistInstance {
   objectName: string;
@@ -88,7 +89,15 @@ const THEME_OPTION_MAP: Record<string, { prop: string; map: (v: unknown) => unkn
   ink: { prop: 'ink', map: (v) => (typeof v === 'string' ? fill(v) : undefined) },
   paper: { prop: 'paper', map: (v) => (typeof v === 'string' ? fill(v) : undefined) },
   baseSize: { prop: 'baseSize', map: (v) => (typeof v === 'number' ? v : undefined) },
+  gridX: { prop: 'gridX', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  gridY: { prop: 'gridY', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  gridMinor: { prop: 'gridMinor', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  ticks: { prop: 'ticks', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  fontFamily: { prop: 'fontFamily', map: (v) => (typeof v === 'string' ? v : undefined) },
 };
+
+/** Axis display units the pane offers. */
+export const LABEL_UNITS = new Set(['none', 'thousands', 'millions', 'billions']);
 
 /** Theme keys the host supplies — present in the code, but never edits. */
 const THEME_HOST_KEYS = new Set(['colorPalette', 'isHighContrast']);
@@ -196,7 +205,10 @@ export function computePaneWriteback(
   }
 
   // --- scales ---
-  const SCALE_PROP: Record<string, string> = { type: 'type', labels: 'labelFormat', dateLabels: 'dateFormat' };
+  const SCALE_PROP: Record<string, string> = {
+    type: 'type', labels: 'labelFormat', dateLabels: 'dateFormat',
+    labelUnit: 'labelUnit', labelColor: 'labelColor', dateBreaks: 'dateBreaks', position: 'position',
+  };
   const scalePatch = (axis: 'x' | 'y', objectName: string): void => {
     const cfg = patch.scales?.[axis];
     const properties: Record<string, unknown> = {};
@@ -207,6 +219,10 @@ export function computePaneWriteback(
       if (key === 'type' && SCALE_TYPES.has(value as string)) properties.type = value;
       else if (key === 'labels' && LABEL_FORMATS.has(value as string)) properties.labelFormat = value;
       else if (key === 'dateLabels' && DATE_FORMATS.has(value as string)) properties.dateFormat = value;
+      else if (key === 'labelUnit' && LABEL_UNITS.has(value as string)) properties.labelUnit = value;
+      else if (key === 'labelColor' && typeof value === 'string') properties.labelColor = fill(value);
+      else if (key === 'dateBreaks' && typeof value === 'string') properties.dateBreaks = value;
+      else if (key === 'position' && axis === 'y' && (value === 'left' || value === 'right')) properties.position = value;
       else residual = true; // min, max, breaks … have no pane slice yet
     }
     // Live scale settings the edit deleted (or the whole call) revert.
@@ -216,7 +232,9 @@ export function computePaneWriteback(
         : typeof liveCfg === 'string' ? { type: liveCfg } : (liveCfg as Record<string, unknown>);
     for (const [key, prop] of Object.entries(SCALE_PROP)) {
       if (liveEntries[key] === undefined || key in entries) continue;
-      revert(properties, objectName, prop);
+      // Empty text is the date-breaks default (automatic spacing).
+      if (prop === 'dateBreaks') properties.dateBreaks = '';
+      else revert(properties, objectName, prop);
     }
     add(objectName, properties);
   };
@@ -231,7 +249,7 @@ export function computePaneWriteback(
   // --- facet: the field is a well; the layout options are properties ---
   {
     const FACET_PROP: Record<string, string> = {
-      ncol: 'columns', freeX: 'freeX', freeY: 'freeY', heights: 'heights',
+      ncol: 'columns', freeX: 'freeX', freeY: 'freeY', heights: 'heights', strips: 'strips', rowAxes: 'rowAxes',
     };
     const properties: Record<string, unknown> = {};
     if (patch.facet) {
@@ -243,6 +261,10 @@ export function computePaneWriteback(
           && value.length > 0 && value.every(h => typeof h === 'number' && h > 0)) {
           // The pane holds row heights as text: [4, 1] → "4,1".
           properties.heights = value.join(',');
+        } else if (key === 'strips' && typeof value === 'boolean') properties.strips = value;
+        else if (key === 'rowAxes' && Array.isArray(value) && value.length > 0
+          && value.every(e => parseRowAxes(e) !== undefined)) {
+          properties.rowAxes = value.join(',');
         } else if (key === 'wrap' || key === 'row' || key === 'col') {
           const liveFacet = live.facet as Record<string, unknown> | undefined;
           if (liveFacet?.[key] !== value) residual = true; // rebinding is well work
@@ -259,7 +281,9 @@ export function computePaneWriteback(
       if (liveFacet[key] === undefined) continue;
       if (patch.facet && key in patch.facet) continue;
       // Empty text is the row-heights default (equal rows).
-      if (prop === 'heights') properties.heights = '';
+      // Empty text is the default of the text options (equal rows, outer axes).
+      if (prop === 'heights' || prop === 'rowAxes') properties[prop] = '';
+      else if (prop === 'strips') properties.strips = true;
       else revert(properties, 'facet', prop);
     }
     add('facet', properties);

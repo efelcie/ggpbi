@@ -11,7 +11,7 @@
  */
 
 import * as d3 from 'd3';
-import type { PlotSpec, DataPoint, AesMapping, GeomConfig, Layer, StatType, ScaleType, AxisScaleConfig, LabelFormat } from './types';
+import type { PlotSpec, DataPoint, AesMapping, GeomConfig, Layer, StatType, ScaleType, AxisScaleConfig } from './types';
 import { bindData, validateAes, type BoundPoint } from './bind-data';
 import { createScale, inferScaleType, createSizeScale, type GgpbiScale, type BandScaleOptions } from './scales';
 import { stats, DEFAULT_GEOM_STAT, type StatResult } from './stats';
@@ -24,6 +24,7 @@ import { estimateLegendWidth, type LegendEntry } from './legend';
 import { extendedBreaks, formatBreaksAs } from './breaks';
 import { describePlot, hasHiddenTransform, fieldLabelsFor, type LayerDescription } from './describe';
 import { shouldWarnAggregated, AGGREGATION_NOTE } from './row-identity';
+import { facetDims, parseRowAxes } from './facet-layout';
 import { specToCode } from './codegen';
 import { specToR } from './r-codegen';
 
@@ -57,6 +58,11 @@ export interface PlotLayout {
   innerWidth: number;
   innerHeight: number;
   margin: { top: number; right: number; bottom: number; left: number };
+  /**
+   * Room the outer margin holds for y tick labels and ticks on the axis
+   * side (left, or right for a right-hand axis). 0 with an explicit margin.
+   */
+  yAxisRoom?: number;
 }
 
 /** Legend info computed from data + theme. */
@@ -518,10 +524,7 @@ export function computeSizeScale(
 const EXPAND_MULT = 0.05;
 
 /** Parse a ScaleConfig entry. */
-export function parseScaleConfig(cfg: ScaleType | AxisScaleConfig | undefined): {
-  type?: ScaleType; min?: number; max?: number; paddingInner?: number; paddingOuter?: number;
-  labels?: LabelFormat; dateLabels?: AxisScaleConfig['dateLabels'];
-} {
+export function parseScaleConfig(cfg: ScaleType | AxisScaleConfig | undefined): AxisScaleConfig {
   if (!cfg) return {};
   if (typeof cfg === 'string') return { type: cfg };
   return cfg;
@@ -1069,7 +1072,7 @@ export function estimateYTickLabelWidth(
     if (!isFinite(lo) || !isFinite(hi)) return 0;
     if (yCfg.min !== undefined) lo = yCfg.min;
     if (yCfg.max !== undefined) hi = yCfg.max;
-    labels = formatBreaksAs(extendedBreaks(lo, hi, theme.nBreaks), yCfg.labels);
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
   }
 
   let maxWidth = 0;
@@ -1092,21 +1095,41 @@ export function computeLayout(
   const height = spec.height ?? 400;
 
   let baseMargin = margin ?? theme.margin;
+  let yAxisRoom = 0;
+  const yRight = parseScaleConfig(spec.scales?.y).position === 'right';
   if (!margin) {
-    // The theme's static left margin budgets one font-height for tick labels,
+    // The theme's static margin budgets one font-height for tick labels,
     // which clips wide labels (e.g. category names on a horizontal strip plot).
-    // Grow the margin to fit the widest estimated y tick label, capped at 40%
-    // of the chart width so extreme labels can't squeeze out the panel.
+    // Grow the y-axis side to fit the widest estimated y tick label, capped at
+    // 40% of the chart width so extreme labels can't squeeze out the panel.
+    // A blank title (" ", ggplot2's labs(y = NULL)) takes no room.
+    const yTitle = !isBlankLabel(spec.yLabel);
     const labelWidth = estimateYTickLabelWidth(spec, spec.data ?? [], theme);
+    const titleRoom = yTitle ? theme.axisTitleSize + theme.axisTitleMargin : 0;
     const required = Math.ceil(
       theme.halfLine * 2                             // outer plot margin
-      + theme.axisTitleSize + theme.axisTitleMargin  // y-axis title strip
+      + titleRoom                                    // y-axis title strip
       + labelWidth
       + theme.tickLength + AXIS_TICK_PADDING,
     );
     const cap = Math.floor(width * 0.4);
-    const left = Math.max(theme.margin.left, Math.min(required, cap));
-    baseMargin = { ...theme.margin, left };
+    const floor = yTitle ? theme.margin.left : Math.round(theme.halfLine * 2);
+    const side = Math.max(floor, Math.min(required, cap));
+    yAxisRoom = Math.max(0, side - theme.halfLine * 2 - titleRoom);
+
+    // Bottom: x tick labels and title, each only when it is drawn.
+    const xTitle = !isBlankLabel(spec.xLabel);
+    const xAxis = drawsBottomXAxis(spec);
+    const bottom = xTitle && xAxis
+      ? theme.margin.bottom
+      : Math.round(
+        theme.halfLine * 2
+        + (xAxis ? theme.axisTextSize + theme.halfLine / 2 : 0)
+        + (xTitle ? theme.axisTitleSize + theme.halfLine / 2 : 0),
+      );
+    baseMargin = yRight
+      ? { ...theme.margin, left: Math.round(theme.halfLine * 2), right: side, bottom }
+      : { ...theme.margin, left: side, bottom };
   }
 
   const effectiveMargin = {
@@ -1122,7 +1145,25 @@ export function computeLayout(
     innerWidth: width - effectiveMargin.left - effectiveMargin.right,
     innerHeight: height - effectiveMargin.top - effectiveMargin.bottom,
     margin: effectiveMargin,
+    yAxisRoom,
   };
+}
+
+/** A label of only whitespace is ggplot2's `labs(x = NULL)`: no title, no room. */
+export function isBlankLabel(label: string | undefined): boolean {
+  return label !== undefined && label.trim() === '';
+}
+
+/**
+ * Does the plot draw x tick labels along its bottom edge? Not when a
+ * facet's `rowAxes` takes them off the last row (the flat bar panel of a
+ * line-over-bars chart), so that edge needs no room for them.
+ */
+export function drawsBottomXAxis(spec: PlotSpec): boolean {
+  const facet = spec.facet;
+  if (!facet?.rowAxes || !(facet.wrap || facet.row || facet.col)) return true;
+  const { nRows } = facetDims(facet, (spec.data ?? []) as Array<Record<string, unknown>>);
+  return parseRowAxes(facet.rowAxes[nRows - 1])?.x ?? true;
 }
 
 // ---------------------------------------------------------------------------

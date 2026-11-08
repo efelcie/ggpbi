@@ -3729,6 +3729,42 @@
                     }
                   }
                 },
+                "labelUnit": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'none'",
+                                "'thousands'",
+                                "'millions'",
+                                "'billions'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "dateFormat": {
                   "type": "object",
                   "additionalProperties": false,
@@ -3762,6 +3798,147 @@
                               ]
                             }
                           }
+                        }
+                      }
+                    }
+                  }
+                },
+                "dateBreaks": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "pattern": "^'[\\s\\S]*'$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "labelColor": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "solid"
+                  ],
+                  "properties": {
+                    "solid": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "color"
+                      ],
+                      "properties": {
+                        "color": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "Literal"
+                                  ],
+                                  "properties": {
+                                    "Literal": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "Value"
+                                      ],
+                                      "properties": {
+                                        "Value": {
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "ThemeDataColor"
+                              ],
+                              "properties": {
+                                "ThemeDataColor": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ColorId"
+                                  ],
+                                  "properties": {
+                                    "ColorId": {
+                                      "type": "integer"
+                                    },
+                                    "Percent": {
+                                      "type": "number"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -3857,6 +4034,40 @@
                     }
                   }
                 },
+                "position": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'left'",
+                                "'right'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "labelFormat": {
                   "type": "object",
                   "additionalProperties": false,
@@ -3886,6 +4097,42 @@
                                 "'compact'",
                                 "'currency'",
                                 "'percent'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "labelUnit": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'none'",
+                                "'thousands'",
+                                "'millions'",
+                                "'billions'"
                               ]
                             }
                           }
@@ -3927,6 +4174,147 @@
                               ]
                             }
                           }
+                        }
+                      }
+                    }
+                  }
+                },
+                "dateBreaks": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "pattern": "^'[\\s\\S]*'$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "labelColor": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "solid"
+                  ],
+                  "properties": {
+                    "solid": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "color"
+                      ],
+                      "properties": {
+                        "color": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "Literal"
+                                  ],
+                                  "properties": {
+                                    "Literal": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "Value"
+                                      ],
+                                      "properties": {
+                                        "Value": {
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "ThemeDataColor"
+                              ],
+                              "properties": {
+                                "ThemeDataColor": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ColorId"
+                                  ],
+                                  "properties": {
+                                    "ColorId": {
+                                      "type": "integer"
+                                    },
+                                    "Percent": {
+                                      "type": "number"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
                         }
                       }
                     }
@@ -5996,6 +6384,173 @@
                     }
                   }
                 },
+                "fontFamily": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "pattern": "^'[\\s\\S]*'$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "gridX": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "gridY": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "gridMinor": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "ticks": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "subtitle": {
                   "type": "object",
                   "additionalProperties": false,
@@ -7028,6 +7583,71 @@
                   }
                 },
                 "heights": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "pattern": "^'[\\s\\S]*'$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "strips": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "true",
+                                "false"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "rowAxes": {
                   "type": "object",
                   "additionalProperties": false,
                   "required": [

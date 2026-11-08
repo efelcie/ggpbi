@@ -86,6 +86,25 @@ export interface AxisScaleConfig {
    * the locale.
    */
   dateLabels?: 'auto' | 'year' | 'monthYear' | 'monthDay' | 'date' | 'dateTime';
+  /**
+   * Fixed spacing of time-axis breaks, ggplot2's `date_breaks`:
+   * "6 months", "1 year", "2 weeks", "1 day". Unset: d3 picks.
+   */
+  dateBreaks?: string;
+  /**
+   * A fixed display unit for every label — Power BI's "display units",
+   * R's `label_number(scale = 1e-6, suffix = "M")`: 0, 500, 1,000 million
+   * read "0M", "500M", "1,000M". Applies to the `auto` and `thousands`
+   * formats; the suffix follows the locale.
+   */
+  labelUnit?: 'none' | 'thousands' | 'millions' | 'billions';
+  /** Tick label colour (ggplot2 `axis.text.x/y = element_text(colour =)`). */
+  labelColor?: string;
+  /**
+   * Which side the axis sits on — ggplot2's `position`. Y: 'left' (default)
+   * or 'right'.
+   */
+  position?: 'left' | 'right';
 }
 
 export interface ScaleConfig {
@@ -608,6 +627,21 @@ export interface FacetConfig {
    * `ggh4x::force_panelsizes(rows = c(4, 1))`. Default: equal rows.
    */
   heights?: number[];
+
+  /**
+   * Draw the strip labels above (and beside) the panels. Default true;
+   * false is ggplot2's `theme(strip.text = element_blank())` — the strips
+   * and their space go.
+   */
+  strips?: boolean;
+
+  /**
+   * Axes per panel row, overriding ggplot2's outer axes: 'x', 'y', 'xy'
+   * or 'none' for each row, e.g. `['xy', 'none']` — the month labels sit
+   * under the first row (between a line panel and a flat bar panel) and
+   * the bar panel shows no scale. Rows without an entry keep the default.
+   */
+  rowAxes?: string[];
 }
 
 export interface SelectionConfig {

@@ -1703,6 +1703,87 @@ inside the visual instead of being cut off.
 
 ---
 
+## The Power BI Look
+
+Native Power BI charts have a look of their own: the value axis on the
+right, labels in fixed display units ("1,500M"), a light horizontal grid,
+no tick marks, the report's Segoe UI. ggpbi reproduces it exactly, with the
+ggplot2 vocabulary for every piece — a ggpbi chart next to a native one
+reads as one report.
+
+| Option | Where | ggplot2 | Power BI |
+|--------|-------|---------|----------|
+| `position: 'right'` | `.scale({ y })` | `scale_y_continuous(position = "right")` | Switch axis position |
+| `labelUnit: 'millions'` | `.scale({ x / y })` | `label_number(scale = 1e-6, suffix = "M")` | Display units |
+| `labelColor` | `.scale({ x / y })` | `theme(axis.text.y = element_text(colour =))` | Label colour |
+| `dateBreaks: '6 months'` | `.scale({ x })` | `scale_x_date(date_breaks = "6 months")` | — (Power BI picks) |
+| `gridX`, `gridY` | `.theme()` | `panel.grid.major.x/y = element_blank()` | Gridlines on/off |
+| `gridMinor` | `.theme()` | `panel.grid.minor = element_blank()` | — (none) |
+| `ticks` | `.theme()` | `axis.ticks = element_blank()` | — (none) |
+| `fontFamily` | `.theme()` | `theme_grey(base_family =)` | Font family |
+| `.labels(' ', ' ')` | builder | `labs(x = NULL, y = NULL)` | Title off |
+| area `size` | `geom_area` layer | `geom_area(colour =, linewidth =)` | Line with area shade |
+| `strips: false` | `.facet()` | `theme(strip.text = element_blank())` | — |
+| `rowAxes: ['xy', 'none']` | `.facet()` | — (ggpbi) | — |
+
+`labelUnit` divides every label by one unit — `0M, 500M, 1,000M, 1,500M`
+— where `compact` picks a unit per value (`500M, 1.0B, 1.5B`). It applies
+to the `auto` and `thousands` formats; with `thousands` the digits group.
+The suffix follows the locale ("Mio." in German). A blank title (`' '`)
+takes no room, so the panel reaches the plot margin. An area layer with a
+`size` draws its upper edge as a line in the layer colour — `alpha` thins
+the fill only, as in ggplot2 — so a shaded LTM line is one layer. Dash
+patterns grow with the line width, so a thick dashed line stays dashed.
+
+```typescript
+// LTM over three years: area from 0, dashed prior-year reference,
+// right axis in fixed millions, labels every six months.
+ggpbi()
+  .data(rows)                                   // month, ltm, priorYear
+  .aes({ x: 'month', y: 'ltm' })
+  .layer({ geom: { type: 'area', color: '#416B84', alpha: 0.15, size: 2 }, aes: { y: 'ltm' } })
+  .layer({ geom: { type: 'line', color: '#8A8886', size: 1, linetype: 'dashed' }, aes: { y: 'priorYear' } })
+  .scale({
+    x: { dateLabels: 'monthYear', dateBreaks: '6 months', labelColor: '#8A8886' },
+    y: { position: 'right', labels: 'thousands', labelUnit: 'millions', labelColor: '#8A8886' },
+  })
+  .theme({ ...themeMinimal(), gridColor: '#E1DFDD', gridX: false, gridMinor: false, ticks: false })
+  .labels(' ', ' ')
+  .renderTo(el);
+```
+
+**Line over flat columns.** The two-part chart of a stock app — the LTM
+line on top, the month labels between, flat month columns below without a
+scale — is one facet with a panel column ("LTM", "Per month"), one measure
+per layer, and three facet options: `heights` for the proportions,
+`strips: false`, and `rowAxes: ['xy', 'none']`. Both panels share the x
+scale, so every column stands exactly under its point of the line.
+
+```typescript
+ggpbi()
+  .data(rows)                                   // month, panel, ltm, perMonth, priorYear
+  .aes({ x: 'month', y: 'ltm' })
+  .layer({ geom: { type: 'line', color: '#416B84', size: 2 }, aes: { y: 'ltm' } })
+  .layer({ geom: { type: 'bar', color: '#C8C6C4' }, aes: { y: 'perMonth' } })
+  .layer({ geom: { type: 'line', color: '#8A8886', size: 1, linetype: 'dashed' }, aes: { y: 'priorYear' } })
+  .facet({ wrap: 'panel', ncol: 1, freeY: true, heights: [120, 19], strips: false, rowAxes: ['xy', 'none'] })
+  .scale({
+    x: { dateLabels: 'monthYear', dateBreaks: '6 months', labelColor: '#8A8886' },
+    y: { position: 'right', labels: 'compact', labelColor: '#416B84' },
+  })
+  .theme({ ...themeMinimal(), gridX: false, gridY: false, gridMinor: false, ticks: false })
+  .labels(' ', ' ')
+  .renderTo(el);
+```
+
+**In Power BI:** X Axis / Y Axis → **Position**, **Display units**, **Date
+breaks**, **Label color**; Theme → **Font family**, **Vertical / Horizontal
+grid lines**, **Minor grid lines**, **Tick marks**; Facets → **Panel
+labels**, **Axes per row**. An axis title of a single space removes the
+title and its room.
+
+---
+
 ## Faceting
 
 Small multiples — a separate panel per category:
@@ -1742,6 +1823,8 @@ panel to a sliver.) The **Facets (Small Multiples)** card overrides it:
 | **Free X scale** | Each panel scales X to its own data (ggplot2 `scales = "free_x"`) |
 | **Free Y scale** | Same for Y |
 | **Row heights** | Relative row heights as text, e.g. `4,1` — empty = equal rows |
+| **Panel labels** | The strip label above each panel; off removes it and its room |
+| **Axes per row** | `x`, `y`, `xy` or `none` per row, e.g. `xy,none` — empty = outer axes |
 
 Free scales matter whenever the panels cover **different ranges** — one
 decade per panel, one region per panel with very different magnitudes.
@@ -1758,6 +1841,8 @@ own data falls into.
 | `freeX` | `false` | Each panel gets its own X scale |
 | `freeY` | `false` | Each panel gets its own Y scale |
 | `heights` | equal | Relative row heights, e.g. `[4, 1]`; recycled over the rows like patchwork's `heights` |
+| `strips` | `true` | `false` removes the strip labels and their room |
+| `rowAxes` | — | Axes per row, `'x'`, `'y'`, `'xy'` or `'none'`, e.g. `['xy', 'none']`; rows without an entry keep the outer axes |
 
 Panels are ordered like ggplot2 factor levels: numerically when all level
 values are numbers (`4, 6, 8` — not first-appearance order), alphabetically

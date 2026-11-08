@@ -359,6 +359,30 @@ function extractEnumValue(val: any): string {
 /** Exported type for a single layer card instance. */
 export type LayerCardInstance = ReturnType<typeof createLayerCard>;
 
+// --- Axis slices shared by both scale cards ---
+
+/** Fixed display unit (Power BI display units; R label_number(scale =, suffix =)). */
+const labelUnitSlice = () => new formattingSettings.AutoDropdown({
+  name: 'labelUnit',
+  displayName: 'Display units',
+  value: 'none',
+});
+
+/** Tick label colour (ggplot2 axis.text = element_text(colour =)). */
+const labelColorSlice = () => new formattingSettings.ColorPicker({
+  name: 'labelColor',
+  displayName: 'Label color',
+  value: { value: '' },
+});
+
+/** Fixed spacing of time-axis breaks (ggplot2 date_breaks). */
+const dateBreaksSlice = () => new formattingSettings.TextInput({
+  name: 'dateBreaks',
+  displayName: 'Date breaks',
+  value: '',
+  placeholder: 'e.g. 6 months',
+});
+
 // --- ScaleX Card ---
 
 class ScaleXCard extends formattingSettings.SimpleCard {
@@ -390,9 +414,15 @@ class ScaleXCard extends formattingSettings.SimpleCard {
     value: 'auto',
   });
 
+  labelUnit = labelUnitSlice();
+  labelColor = labelColorSlice();
+  dateBreaks = dateBreaksSlice();
+
   name = 'scaleX';
   displayName = 'X Axis';
-  slices: formattingSettings.Slice[] = [this.type, this.label, this.labelFormat, this.dateFormat];
+  slices: formattingSettings.Slice[] = [
+    this.type, this.label, this.labelFormat, this.labelUnit, this.dateFormat, this.dateBreaks, this.labelColor,
+  ];
 }
 
 // --- ScaleY Card ---
@@ -424,9 +454,23 @@ class ScaleYCard extends formattingSettings.SimpleCard {
     value: 'auto',
   });
 
+  labelUnit = labelUnitSlice();
+  labelColor = labelColorSlice();
+  dateBreaks = dateBreaksSlice();
+
+  /** Which side the axis sits on (ggplot2 scale_y_continuous(position = "right")). */
+  position = new formattingSettings.AutoDropdown({
+    name: 'position',
+    displayName: 'Position',
+    value: 'left',
+  });
+
   name = 'scaleY';
   displayName = 'Y Axis';
-  slices: formattingSettings.Slice[] = [this.type, this.label, this.labelFormat, this.dateFormat];
+  slices: formattingSettings.Slice[] = [
+    this.type, this.label, this.position, this.labelFormat, this.labelUnit, this.dateFormat, this.dateBreaks,
+    this.labelColor,
+  ];
 }
 
 // --- Legend Card ---
@@ -544,6 +588,40 @@ class ThemeCard extends formattingSettings.SimpleCard {
     },
   });
 
+  // Panel elements, ggplot2's panel.grid.major.x / .y, panel.grid.minor
+  // and axis.ticks — off reproduces a Power BI chart's sparse look.
+  gridX = new formattingSettings.ToggleSwitch({
+    name: 'gridX',
+    displayName: 'Vertical grid lines',
+    value: true,
+  });
+
+  gridY = new formattingSettings.ToggleSwitch({
+    name: 'gridY',
+    displayName: 'Horizontal grid lines',
+    value: true,
+  });
+
+  gridMinor = new formattingSettings.ToggleSwitch({
+    name: 'gridMinor',
+    displayName: 'Minor grid lines',
+    value: true,
+  });
+
+  ticks = new formattingSettings.ToggleSwitch({
+    name: 'ticks',
+    displayName: 'Tick marks',
+    value: true,
+  });
+
+  // ggplot2's base_family. Empty = Power BI's own Segoe UI stack.
+  fontFamily = new formattingSettings.TextInput({
+    name: 'fontFamily',
+    displayName: 'Font family',
+    value: '',
+    placeholder: 'Segoe UI (default)',
+  });
+
   name = 'theme';
   displayName = 'Theme';
   slices: formattingSettings.Slice[] = [
@@ -559,6 +637,11 @@ class ThemeCard extends formattingSettings.SimpleCard {
     this.ink,
     this.paper,
     this.baseSize,
+    this.fontFamily,
+    this.gridX,
+    this.gridY,
+    this.gridMinor,
+    this.ticks,
   ];
 }
 
@@ -1107,9 +1190,24 @@ class FacetCard extends formattingSettings.SimpleCard {
     placeholder: 'e.g. 4,1',
   });
 
+  /** Strip labels on/off (ggplot2 strip.text = element_blank()). */
+  strips = new formattingSettings.ToggleSwitch({
+    name: 'strips',
+    displayName: 'Panel labels',
+    value: true,
+  });
+
+  /** Axes per row ("xy,none"), overriding the outer-axes rule. */
+  rowAxes = new formattingSettings.TextInput({
+    name: 'rowAxes',
+    displayName: 'Axes per row',
+    value: '',
+    placeholder: 'e.g. xy,none',
+  });
+
   name = 'facet';
   displayName = 'Facets (Small Multiples)';
-  slices = [this.columns, this.freeX, this.freeY, this.heights];
+  slices = [this.columns, this.freeX, this.freeY, this.heights, this.strips, this.rowAxes];
 }
 
 export class GgpbiFormattingSettings extends formattingSettings.Model {
