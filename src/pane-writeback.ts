@@ -80,6 +80,9 @@ const LAYER_OPTION_MAP: Record<string, { prop: string; map: (v: unknown) => unkn
   orientation: { prop: 'orientation', map: (v) => (v === 'x' || v === 'y' ? v : undefined) },
   repel: { prop: 'repel', map: (v) => (typeof v === 'boolean' ? v : undefined) },
   labelTemplate: { prop: 'labelTemplate', map: (v) => (typeof v === 'string' ? v : undefined) },
+  endPoint: { prop: 'endPoint', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  endLabel: { prop: 'endLabel', map: (v) => (typeof v === 'boolean' ? v : undefined) },
+  lastFill: { prop: 'lastFill', map: (v) => (typeof v === 'string' ? fill(v) : undefined) },
 };
 
 /** Theme option → theme-card property. */

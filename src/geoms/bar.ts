@@ -127,8 +127,21 @@ export function barsToScene(
     dodgeWidth = (baseBandWidth - dodgePadding * (nColors - 1)) / nColors;
   }
 
+  // lastFill: the last category along the axis — the latest month on a
+  // time axis, the rightmost (or, for horizontal bars, topmost) band —
+  // in its own colour. ggplot2: aes(fill = month == max(month)).
+  const lastCatPx = config.lastFill
+    ? d3.max(catPositions.map(p => (isHorizontal ? -p : p)).filter(Number.isFinite))
+    : undefined;
+  const isLast = (d: BoundPoint): boolean => {
+    if (lastCatPx === undefined) return false;
+    const p = Number(catScale(isHorizontal ? d.y : d.x));
+    return Number.isFinite(p) && Math.abs((isHorizontal ? -p : p) - lastCatPx) < 1e-6;
+  };
+
   for (const d of barPoints) {
     const style = computeBarStyle(d, config, colorScale);
+    if (config.lastFill && isLast(d)) style.fill = config.lastFill;
     const aria = { role: 'listitem', tabindex: '0', label: barAriaLabel(d, isHorizontal) };
     let x: number, y: number, width: number, height: number;
 

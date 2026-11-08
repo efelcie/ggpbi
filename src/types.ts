@@ -195,6 +195,26 @@ export interface BaseGeomConfig {
   linejoin?: 'round' | 'miter' | 'bevel';
   /** SVG stroke-miterlimit (ggplot2 linemitre). Default: 10. */
   linemitre?: number;
+  /**
+   * Line and area layers: a dot at the last point (ggplot2
+   * `geom_point(data = ~ slice_max(.x, x))`). Default: false.
+   */
+  endPoint?: boolean;
+  /**
+   * Line and area layers: a label at the last point, in the layer colour —
+   * direct labelling instead of reading the axis or a legend. The text is
+   * `labelTemplate` when set ("Prior year", "{y:.3s}"), otherwise the
+   * value formatted like the y axis. Default: false.
+   */
+  endLabel?: boolean;
+  /** Label template for text layers and end labels: '{label} {x:.1%}'. */
+  labelTemplate?: string;
+  /**
+   * Bar layers: the colour of the last bar along the category axis — the
+   * reporting month on a time axis. ggplot2:
+   * `aes(fill = month == max(month))` with a manual scale.
+   */
+  lastFill?: string;
 }
 
 /** Point-specific options. */

@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ggpbi } from '../src/index';
 import { formatInUnit } from '../src/format';
 import { formatBreaksAs } from '../src/breaks';
-import { parseDateBreaks } from '../src/panel';
+import { parseDateBreaks, formatLikeAxis } from '../src/panel';
 import { linetypeToDasharray } from '../src/geoms/util';
 import { parseRowAxes, parseRowAxesText } from '../src/facet-layout';
 import { specToR } from '../src/r-codegen';
@@ -298,5 +298,78 @@ describe('in the Power BI visual', () => {
     expect(xText).toContain('Jul 2024');
     expect(svg!.querySelectorAll('.ggpbi-grid, .ggpbi-grid-minor').length).toBe(0);
     expect(svg!.querySelector('.ggpbi-axis-label-x')).toBeNull();
+  });
+});
+
+describe('direct labels and the reporting month', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  const rows = months.map((m, i) => ({ month: m, ltm: 5.4e6 + i * 6.6e4, prior: 6.8e6, pm: 5.6e5 + (i % 5) * 2e4 }));
+
+  it('formats an end value at the axis precision', () => {
+    const ticks = [5.5e6, 6e6, 6.5e6, 7e6, 7.5e6];
+    expect(formatLikeAxis(7_531_234, ticks, 'compact', EN)).toBe('7.5M');
+    expect(formatLikeAxis(1_828_000_000, [0, 5e8, 1e9, 1.5e9], 'thousands', { ...EN, unit: 'millions' })).toBe('1,800M');
+  });
+
+  it('a dot and the value at the end of the line, the reference named on its line', () => {
+    const svg = ggpbi()
+      .data(rows)
+      .aes({ x: 'month', y: 'ltm' })
+      .layer({ geom: { type: 'line', color: '#416B84', size: 2, endPoint: true, endLabel: true }, aes: { y: 'ltm' } } as any)
+      .layer({ geom: { type: 'line', color: '#8A8886', linetype: 'dashed', endLabel: true, labelTemplate: 'Prior year' }, aes: { y: 'prior' } } as any)
+      .scale({ y: { position: 'right', labels: 'compact' } } as any)
+      .format(EN)
+      .size(440, 220)
+      .renderTo(container);
+
+    const dot = svg.querySelector('.ggpbi-end-point')!;
+    expect(dot.getAttribute('fill')).toBe('#416B84');
+    const labels = Array.from(svg.querySelectorAll('.ggpbi-end-label'));
+    expect(labels.map(l => l.textContent)).toEqual(['7.5M', 'Prior year']);
+    expect(labels.map(l => l.getAttribute('fill'))).toEqual(['#416B84', '#8A8886']);
+    // The dot sits on the last point, the label ends there.
+    expect(labels[0].getAttribute('x')).toBe(dot.getAttribute('cx'));
+    expect(labels[0].getAttribute('text-anchor')).toBe('end');
+    // A rising line gets its label above the point.
+    expect(parseFloat(labels[0].getAttribute('y')!)).toBeLessThan(parseFloat(dot.getAttribute('cy')!));
+  });
+
+  it('the last bar takes its own colour', () => {
+    const svg = ggpbi()
+      .data(rows)
+      .aes({ x: 'month', y: 'pm' })
+      .geom('bar', { color: '#C8C6C4', lastFill: '#416B84' } as any)
+      .size(440, 120)
+      .renderTo(container);
+    const fills = Array.from(svg.querySelectorAll('.ggpbi-bar')).map(b => b.getAttribute('fill'));
+    expect(fills).toHaveLength(33);
+    expect(fills.filter(f => f === '#416B84')).toHaveLength(1);
+    // It is the rightmost one: the reporting month.
+    const bars = Array.from(svg.querySelectorAll('.ggpbi-bar'));
+    const rightmost = bars.reduce((a, b) => (parseFloat(b.getAttribute('x')!) > parseFloat(a.getAttribute('x')!) ? b : a));
+    expect(rightmost.getAttribute('fill')).toBe('#416B84');
+  });
+
+  it('the Power BI visual reads the three options', () => {
+    const { container: c } = renderVisual({
+      categories: [{ name: 'Month End', role: 'x', values: rows.map(r => r.month) }],
+      measures: [{ name: 'LTM', values: rows.map(r => r.ltm) }, { name: 'Per month', values: rows.map(r => r.pm) }],
+      objects: {
+        layer1: { enabled: true, type: 'line', yField: 'y1', endPoint: true, endLabel: true },
+        layer2: { enabled: true, type: 'bar', yField: 'y2', lastFill: { solid: { color: '#416B84' } } },
+        scaleY: { labelFormat: 'compact' },
+      },
+    });
+    const svg = c.querySelector('svg');
+    expect(svg, c.textContent ?? '').not.toBeNull();
+    expect(svg!.querySelectorAll('.ggpbi-end-point').length).toBe(1);
+    expect(svg!.querySelector('.ggpbi-end-label')?.textContent).toMatch(/M$/);
+    const fills = Array.from(svg!.querySelectorAll('.ggpbi-bar')).map(b => b.getAttribute('fill'));
+    expect(fills.filter(f => f === '#416B84')).toHaveLength(1);
   });
 });

@@ -226,6 +226,26 @@ function createLayerCard(index: number) {
     },
   });
 
+  // --- Direct labels and the highlighted last bar ---
+
+  const endPoint = new formattingSettings.ToggleSwitch({
+    name: 'endPoint',
+    displayName: 'End point',
+    value: false,
+  });
+
+  const endLabel = new formattingSettings.ToggleSwitch({
+    name: 'endLabel',
+    displayName: 'End label',
+    value: false,
+  });
+
+  const lastFill = new formattingSettings.ColorPicker({
+    name: 'lastFill',
+    displayName: 'Last bar color',
+    value: { value: '' },
+  });
+
   // --- Build groups ---
 
   const suffix = index + 1; // 1, 2, 3 — unique per layer
@@ -240,7 +260,7 @@ function createLayerCard(index: number) {
     name: `appearance${suffix}`,
     displayName: 'Appearance',
     collapsible: true,
-    slices: [alpha, size, fill, lineStyle, orientation],
+    slices: [alpha, size, fill, lastFill, lineStyle, orientation],
   });
 
   const pointGroup = new formattingSettings.Group({
@@ -261,7 +281,7 @@ function createLayerCard(index: number) {
     name: `lineSettings${suffix}`,
     displayName: 'Line & Arrow',
     collapsible: true,
-    slices: [lineEnd, lineJoin, arrowShow, arrowEnds, arrowType, arrowLength, arrowAngle],
+    slices: [endPoint, endLabel, lineEnd, lineJoin, arrowShow, arrowEnds, arrowType, arrowLength, arrowAngle],
   });
 
   // --- CompositeCard with onPreProcess for conditional visibility ---
@@ -294,6 +314,9 @@ function createLayerCard(index: number) {
     arrowType = arrowType;
     arrowLength = arrowLength;
     arrowAngle = arrowAngle;
+    endPoint = endPoint;
+    endLabel = endLabel;
+    lastFill = lastFill;
 
     name = `layer${index + 1}`;
     displayName = `Layer ${index + 1}`;
@@ -339,9 +362,16 @@ function createLayerCard(index: number) {
       jitterWidth.visible = pos === 'jitter';
       jitterHeight.visible = pos === 'jitter';
 
-      // Repel labels and label template: only for text geoms
+      // Repel labels: text geoms. The label template also names an end
+      // label ("Prior year") on lines and areas.
       repel.visible = geomType === 'text';
-      labelTemplate.visible = geomType === 'text';
+      const endLabelled = (geomType === 'line' || geomType === 'area' || geomType === 'auto') && this.endLabel.value;
+      labelTemplate.visible = geomType === 'text' || endLabelled;
+
+      // End marks: lines and areas; the last bar's colour: bars.
+      endPoint.visible = geomType === 'line' || geomType === 'area' || geomType === 'auto';
+      endLabel.visible = endPoint.visible;
+      lastFill.visible = BAR_GEOMS.has(geomType);
 
       // Line style: relevant for line, area, smooth, point (borders)
       lineStyle.visible = LINE_GEOMS.has(geomType) || geomType === 'point';

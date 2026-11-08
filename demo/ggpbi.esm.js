@@ -67,15 +67,15 @@ var bisect_default = bisectRight;
 // node_modules/d3-array/src/extent.js
 function extent(values, valueof) {
   let min2;
-  let max2;
+  let max3;
   if (valueof === void 0) {
     for (const value of values) {
       if (value != null) {
         if (min2 === void 0) {
-          if (value >= value) min2 = max2 = value;
+          if (value >= value) min2 = max3 = value;
         } else {
           if (min2 > value) min2 = value;
-          if (max2 < value) max2 = value;
+          if (max3 < value) max3 = value;
         }
       }
     }
@@ -84,15 +84,15 @@ function extent(values, valueof) {
     for (let value of values) {
       if ((value = valueof(value, ++index2, values)) != null) {
         if (min2 === void 0) {
-          if (value >= value) min2 = max2 = value;
+          if (value >= value) min2 = max3 = value;
         } else {
           if (min2 > value) min2 = value;
-          if (max2 < value) max2 = value;
+          if (max3 < value) max3 = value;
         }
       }
     }
   }
-  return [min2, max2];
+  return [min2, max3];
 }
 
 // node_modules/internmap/src/index.js
@@ -213,6 +213,26 @@ function tickStep(start2, stop, count) {
   stop = +stop, start2 = +start2, count = +count;
   const reverse = stop < start2, inc = reverse ? tickIncrement(stop, start2, count) : tickIncrement(start2, stop, count);
   return (reverse ? -1 : 1) * (inc < 0 ? 1 / -inc : inc);
+}
+
+// node_modules/d3-array/src/max.js
+function max(values, valueof) {
+  let max3;
+  if (valueof === void 0) {
+    for (const value of values) {
+      if (value != null && (max3 < value || max3 === void 0 && value >= value)) {
+        max3 = value;
+      }
+    }
+  } else {
+    let index2 = -1;
+    for (let value of values) {
+      if ((value = valueof(value, ++index2, values)) != null && (max3 < value || max3 === void 0 && value >= value)) {
+        max3 = value;
+      }
+    }
+  }
+  return max3;
 }
 
 // node_modules/d3-array/src/quantile.js
@@ -1509,12 +1529,12 @@ function hslConvert(o) {
   if (!o) return new Hsl();
   if (o instanceof Hsl) return o;
   o = o.rgb();
-  var r = o.r / 255, g = o.g / 255, b = o.b / 255, min2 = Math.min(r, g, b), max2 = Math.max(r, g, b), h = NaN, s = max2 - min2, l = (max2 + min2) / 2;
+  var r = o.r / 255, g = o.g / 255, b = o.b / 255, min2 = Math.min(r, g, b), max3 = Math.max(r, g, b), h = NaN, s = max3 - min2, l = (max3 + min2) / 2;
   if (s) {
-    if (r === max2) h = (g - b) / s + (g < b) * 6;
-    else if (g === max2) h = (b - r) / s + 2;
+    if (r === max3) h = (g - b) / s + (g < b) * 6;
+    else if (g === max3) h = (b - r) / s + 2;
     else h = (r - g) / s + 4;
-    s /= l < 0.5 ? max2 + min2 : 2 - max2 - min2;
+    s /= l < 0.5 ? max3 + min2 : 2 - max3 - min2;
     h *= 60;
   } else {
     s = l > 0 && l < 1 ? 0 : h;
@@ -2669,7 +2689,7 @@ selection_default.prototype.interrupt = interrupt_default2;
 selection_default.prototype.transition = transition_default2;
 
 // node_modules/d3-brush/src/brush.js
-var { abs, max, min } = Math;
+var { abs, max: max2, min } = Math;
 function number1(e) {
   return [+e[0], +e[1]];
 }
@@ -3040,9 +3060,9 @@ function precisionPrefix_default(step, value) {
 }
 
 // node_modules/d3-format/src/precisionRound.js
-function precisionRound_default(step, max2) {
-  step = Math.abs(step), max2 = Math.abs(max2) - step;
-  return Math.max(0, exponent_default(max2) - exponent_default(step)) + 1;
+function precisionRound_default(step, max3) {
+  step = Math.abs(step), max3 = Math.abs(max3) - step;
+  return Math.max(0, exponent_default(max3) - exponent_default(step)) + 1;
 }
 
 // node_modules/d3-scale/src/init.js
@@ -5673,8 +5693,15 @@ function barsToScene(points, xScale, yScale, config, colorScale, innerWidth) {
     dodgePadding = padded ? baseBandWidth / nColors * 0.1 : 0;
     dodgeWidth = (baseBandWidth - dodgePadding * (nColors - 1)) / nColors;
   }
+  const lastCatPx = config.lastFill ? max(catPositions.map((p) => isHorizontal ? -p : p).filter(Number.isFinite)) : void 0;
+  const isLast = (d) => {
+    if (lastCatPx === void 0) return false;
+    const p = Number(catScale(isHorizontal ? d.y : d.x));
+    return Number.isFinite(p) && Math.abs((isHorizontal ? -p : p) - lastCatPx) < 1e-6;
+  };
   for (const d of barPoints) {
     const style = computeBarStyle(d, config, colorScale);
+    if (config.lastFill && isLast(d)) style.fill = config.lastFill;
     const aria = { role: "listitem", tabindex: "0", label: barAriaLabel(d, isHorizontal) };
     let x2, y2, width, height;
     if (position === "dodge" || position === "dodge2") {
@@ -8796,6 +8823,67 @@ function applyOverlapCheck(axisGroup, direction) {
     }
   }
 }
+function formatLikeAxis(value, ticks2, labelFormat, fmt) {
+  const finite = [...new Set(ticks2.filter(Number.isFinite))].sort((a, b) => a - b);
+  let rounded = value;
+  if (finite.length >= 2) {
+    let diff = Infinity;
+    for (let i = 1; i < finite.length; i++) diff = Math.min(diff, finite[i] - finite[i - 1]);
+    if (diff > 0 && Number.isFinite(diff)) {
+      let p = Math.pow(10, Math.floor(Math.log10(diff) + 1e-9) - 1);
+      if (finite.every((t2) => Math.round(t2 / p) % 10 === 0)) p *= 10;
+      rounded = Math.round(value / p) * p;
+    }
+  }
+  const labels = formatBreaksAs([...finite, rounded], labelFormat, fmt);
+  return labels[labels.length - 1];
+}
+function drawEndMarks(ctx, yTicks) {
+  const { panelG, xScale, yScale, theme: theme2, geoms, layerData, colorScale, innerHeight: innerHeight2 } = ctx;
+  const xo = bandOffset(xScale);
+  const yo = bandOffset(yScale);
+  const fontSize = theme2.axisTextSize;
+  const placed = [];
+  const numericTicks = yTicks.filter((t2) => typeof t2 === "number");
+  let group2;
+  geoms.forEach((geom, li) => {
+    if (geom.type !== "line" && geom.type !== "area") return;
+    if (!geom.endPoint && !geom.endLabel) return;
+    const px = (p) => Number(xScale(p.x)) + xo;
+    const py = (p) => Number(yScale(p.y)) + yo;
+    const pts = (layerData[li] ?? []).filter((p) => p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
+    const groups2 = group(pts, (p) => p.color === void 0 ? "" : String(p.color));
+    for (const [key, groupPts] of groups2) {
+      const sorted = [...groupPts].sort((a, b2) => px(a) - px(b2));
+      const last = sorted[sorted.length - 1];
+      const prev = sorted[sorted.length - 2];
+      if (!last) continue;
+      const color2 = key !== "" && colorScale ? colorScale(key) : geom.color ?? GEOM_DEFAULT_COLOR;
+      const x2 = px(last);
+      const y2 = py(last);
+      group2 ??= panelG.append("g").attr("class", "ggpbi-end-marks");
+      const lineWidth = geom.size ?? 2;
+      const r = Math.max(2.5, lineWidth * 1.4);
+      if (geom.endPoint) {
+        group2.append("circle").attr("class", "ggpbi-end-point").attr("cx", x2).attr("cy", y2).attr("r", r).attr("fill", color2);
+      }
+      if (!geom.endLabel) continue;
+      const text = geom.labelTemplate ? renderLabelTemplate(geom.labelTemplate, last) : typeof last.y === "number" ? formatLikeAxis(last.y, numericTicks, ctx.yLabelFormat, { ...ctx.format, unit: ctx.yLabelUnit }) : String(last.y);
+      if (!text) continue;
+      const w = text.length * fontSize * 0.6;
+      const gap = (geom.endPoint ? r : lineWidth / 2) + fontSize * 0.35;
+      const box = (above2) => above2 ? { x0: x2 - w, x1: x2, y0: y2 - gap - fontSize, y1: y2 - gap } : { x0: x2 - w, x1: x2, y0: y2 + gap, y1: y2 + gap + fontSize };
+      let above = !prev || py(prev) >= y2;
+      if (above && box(true).y0 < -theme2.halfLine * 2) above = false;
+      else if (!above && box(false).y1 > innerHeight2) above = true;
+      const hits = (b2) => placed.some((q2) => b2.x0 < q2.x1 && b2.x1 > q2.x0 && b2.y0 < q2.y1 && b2.y1 > q2.y0);
+      if (hits(box(above)) && !hits(box(!above))) above = !above;
+      const b = box(above);
+      placed.push(b);
+      group2.append("text").attr("class", "ggpbi-end-label").attr("x", x2).attr("y", b.y1 - fontSize * 0.2).attr("text-anchor", "end").attr("font-size", `${fontSize}px`).attr("font-weight", geom.labelTemplate ? 400 : 600).attr("fill", color2).text(text);
+    }
+  });
+}
 function renderPanel(ctx) {
   const { panelG, svg, innerWidth, innerHeight: innerHeight2, xScale, yScale, theme: theme2, colorScale, geoms, layerData } = ctx;
   panelG.insert("rect", ":first-child").attr("class", "ggpbi-panel").attr("width", innerWidth).attr("height", innerHeight2).attr("fill", theme2.panelFill);
@@ -8890,6 +8978,7 @@ function renderPanel(ctx) {
       layerGroup.append("text").attr("class", "ggpbi-layer-error").attr("x", innerWidth / 2).attr("y", innerHeight2 / 2).attr("text-anchor", "middle").attr("fill", theme2.axisTextColor).attr("font-size", `${theme2.axisTextSize}px`).attr("opacity", 0.6).text(`Layer "${geom.type}" failed`);
     }
   }
+  drawEndMarks(ctx, yTicks);
   if (theme2.isHighContrast) {
     panelG.selectAll(".ggpbi-bar").attr("stroke", theme2.ink).attr("stroke-width", theme2.highContrastStrokeWidth);
     panelG.selectAll(".ggpbi-point").attr("stroke", theme2.ink).attr("stroke-width", theme2.highContrastStrokeWidth);
@@ -9175,10 +9264,10 @@ function scaleLine(axis2, cfg) {
   return `scale_${axis2}_continuous(${args.join(", ")})`;
 }
 function limitsArg(conf) {
-  const { min: min2, max: max2 } = conf;
-  if (min2 === void 0 && max2 === void 0) return void 0;
+  const { min: min2, max: max3 } = conf;
+  if (min2 === void 0 && max3 === void 0) return void 0;
   const lo = min2 === void 0 ? "NA" : rValue(min2);
-  const hi = max2 === void 0 ? "NA" : rValue(max2);
+  const hi = max3 === void 0 ? "NA" : rValue(max3);
   return `limits = c(${lo}, ${hi})`;
 }
 function specToR(spec, labels = {}) {
@@ -22807,8 +22896,8 @@ var lineNumberGutter = /* @__PURE__ */ activeGutters.compute([lineNumberConfig],
     return new NumberMarker(formatNumber(view, maxLineNumber(view.state.doc.lines)));
   },
   updateSpacer(spacer, update) {
-    let max2 = formatNumber(update.view, maxLineNumber(update.view.state.doc.lines));
-    return max2 == spacer.number ? spacer : new NumberMarker(max2);
+    let max3 = formatNumber(update.view, maxLineNumber(update.view.state.doc.lines));
+    return max3 == spacer.number ? spacer : new NumberMarker(max3);
   },
   domEventHandlers: state.facet(lineNumberConfig).domEventHandlers,
   side: "before"
@@ -27965,17 +28054,17 @@ function optionContent(config) {
   });
   return content2.sort((a, b) => a.position - b.position).map((a) => a.render);
 }
-function rangeAroundSelected(total, selected, max2) {
-  if (total <= max2)
+function rangeAroundSelected(total, selected, max3) {
+  if (total <= max3)
     return { from: 0, to: total };
   if (selected < 0)
     selected = 0;
   if (selected <= total >> 1) {
-    let off3 = Math.floor(selected / max2);
-    return { from: off3 * max2, to: (off3 + 1) * max2 };
+    let off3 = Math.floor(selected / max3);
+    return { from: off3 * max3, to: (off3 + 1) * max3 };
   }
-  let off2 = Math.ceil((total - selected) / max2);
-  return { from: total - off2 * max2, to: total - (off2 - 1) * max2 };
+  let off2 = Math.ceil((total - selected) / max3);
+  return { from: total - off2 * max3, to: total - (off2 - 1) * max3 };
 }
 var CompletionTooltip = class {
   constructor(view, stateField, applyCompletion2) {
@@ -32262,8 +32351,8 @@ function initVim(CM) {
     var curHead = cm.getCursor("head");
     var primIndex = getIndex(ranges, curHead);
     var wasClipped = cursorEqual(ranges[primIndex].head, ranges[primIndex].anchor);
-    var max2 = ranges.length - 1;
-    var index2 = max2 - primIndex > primIndex ? max2 : 0;
+    var max3 = ranges.length - 1;
+    var index2 = max3 - primIndex > primIndex ? max3 : 0;
     var base2 = ranges[index2].anchor;
     var firstLine = Math.min(base2.line, head.line);
     var lastLine = Math.max(base2.line, head.line);
@@ -32833,7 +32922,7 @@ function initVim(CM) {
   function findParagraph(cm, head, repeat, dir, inclusive) {
     var line = head.line;
     var min2 = cm.firstLine();
-    var max2 = cm.lastLine();
+    var max3 = cm.lastLine();
     var start2, end, i = line;
     function isEmpty(i2) {
       return !cm.getLine(i2);
@@ -32845,7 +32934,7 @@ function initVim(CM) {
       return !isEmpty(i2) && isEmpty(i2 + dir2);
     }
     if (dir) {
-      while (min2 <= i && i <= max2 && repeat > 0) {
+      while (min2 <= i && i <= max3 && repeat > 0) {
         if (isBoundary(i, dir)) {
           repeat--;
         }
@@ -32863,7 +32952,7 @@ function initVim(CM) {
       }
     }
     var startState = isEmpty(line);
-    for (i = line; i <= max2 && repeat; i++) {
+    for (i = line; i <= max3 && repeat; i++) {
       if (isBoundary(i, 1, true)) {
         if (!inclusive || isEmpty(i) != startState) {
           repeat--;
@@ -32871,7 +32960,7 @@ function initVim(CM) {
       }
     }
     end = new Pos2(i, 0);
-    if (i > max2 && !startState) {
+    if (i > max3 && !startState) {
       startState = true;
     } else {
       inclusive = false;
@@ -36518,14 +36607,14 @@ var Marker = class {
 };
 function hardWrap(cm, options2) {
   var _a2;
-  var max2 = options2.column || cm.getOption("textwidth") || 80;
+  var max3 = options2.column || cm.getOption("textwidth") || 80;
   var allowMerge = options2.allowMerge != false;
   var row = Math.min(options2.from, options2.to);
   var endRow = Math.max(options2.from, options2.to);
   while (row <= endRow) {
     var line = cm.getLine(row);
-    if (line.length > max2) {
-      var space = findSpace(line, max2, 5);
+    if (line.length > max3) {
+      var space = findSpace(line, max3, 5);
       if (space) {
         var indentation = (_a2 = /^\s*/.exec(line)) === null || _a2 === void 0 ? void 0 : _a2[0];
         cm.replaceRange("\n" + indentation, new Pos(row, space.start), new Pos(row, space.end));
@@ -36537,8 +36626,8 @@ function hardWrap(cm, options2) {
         var trimmedLine = line.replace(/\s+$/, "");
         var trimmedNextLine = nextLine.replace(/^\s+/, "");
         var mergedLine = trimmedLine + " " + trimmedNextLine;
-        var space = findSpace(mergedLine, max2, 5);
-        if (space && space.start > trimmedLine.length || mergedLine.length < max2) {
+        var space = findSpace(mergedLine, max3, 5);
+        if (space && space.start > trimmedLine.length || mergedLine.length < max3) {
           cm.replaceRange(" ", new Pos(row, trimmedLine.length), new Pos(row + 1, nextLine.length - trimmedNextLine.length));
           row--;
           endRow--;
@@ -36550,23 +36639,23 @@ function hardWrap(cm, options2) {
     row++;
   }
   return row;
-  function findSpace(line2, max3, min2) {
-    if (line2.length < max3)
+  function findSpace(line2, max4, min2) {
+    if (line2.length < max4)
       return;
-    var before = line2.slice(0, max3);
-    var after = line2.slice(max3);
+    var before = line2.slice(0, max4);
+    var after = line2.slice(max4);
     var spaceAfter = /^(?:(\s+)|(\S+)(\s+))/.exec(after);
     var spaceBefore = /(?:(\s+)|(\s+)(\S+))$/.exec(before);
     var start2 = 0;
     var end = 0;
     if (spaceBefore && !spaceBefore[2]) {
-      start2 = max3 - spaceBefore[1].length;
-      end = max3;
+      start2 = max4 - spaceBefore[1].length;
+      end = max4;
     }
     if (spaceAfter && !spaceAfter[2]) {
       if (!start2)
-        start2 = max3;
-      end = max3 + spaceAfter[1].length;
+        start2 = max4;
+      end = max4 + spaceAfter[1].length;
     }
     if (start2) {
       return {
@@ -36581,7 +36670,7 @@ function hardWrap(cm, options2) {
       };
     }
     if (spaceAfter && spaceAfter[2]) {
-      start2 = max3 + spaceAfter[2].length;
+      start2 = max4 + spaceAfter[2].length;
       return {
         start: start2,
         end: start2 + spaceAfter[3].length
@@ -40514,7 +40603,10 @@ var LAYER_OPTION_MAP = {
   just: { prop: "just", map: (v) => typeof v === "number" ? v : void 0 },
   orientation: { prop: "orientation", map: (v) => v === "x" || v === "y" ? v : void 0 },
   repel: { prop: "repel", map: (v) => typeof v === "boolean" ? v : void 0 },
-  labelTemplate: { prop: "labelTemplate", map: (v) => typeof v === "string" ? v : void 0 }
+  labelTemplate: { prop: "labelTemplate", map: (v) => typeof v === "string" ? v : void 0 },
+  endPoint: { prop: "endPoint", map: (v) => typeof v === "boolean" ? v : void 0 },
+  endLabel: { prop: "endLabel", map: (v) => typeof v === "boolean" ? v : void 0 },
+  lastFill: { prop: "lastFill", map: (v) => typeof v === "string" ? fill(v) : void 0 }
 };
 var THEME_OPTION_MAP = {
   panelFill: { prop: "panelFill", map: (v) => typeof v === "string" ? fill(v) : void 0 },

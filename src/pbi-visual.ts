@@ -702,6 +702,13 @@ export class Visual implements IVisual {
             ...(layerApplyHighlight === false && { highlight: false }),
             ...(layerFilter && layerFilter !== 'none' && { filter: layerFilter }),
             ...(layerLabelTemplate && { labelTemplate: layerLabelTemplate }),
+            // Direct labels and the highlighted last bar (only when set).
+            ...(layerSettings.endPoint.value && { endPoint: true }),
+            ...(layerSettings.endLabel.value && { endLabel: true }),
+            ...((): { lastFill?: string } => {
+              const last = extractFill(layerSettings.lastFill.value, `layer${li + 1}`, 'lastFill');
+              return last ? { lastFill: last } : {};
+            })(),
           } as GeomConfig,
           aes: layerAes,
         });

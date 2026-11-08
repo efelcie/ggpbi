@@ -1776,8 +1776,31 @@ ggpbi()
   .renderTo(el);
 ```
 
+**Direct labels — what a native chart cannot do.** Three layer options
+label the chart where the eye already is, instead of an axis lookup or a
+legend:
+
+| Option | Layers | ggplot2 |
+|--------|--------|---------|
+| `endPoint: true` | line, area | `geom_point(data = ~ slice_max(.x, month))` |
+| `endLabel: true` | line, area | `geom_text(data = ~ slice_max(.x, month), aes(label = …))` |
+| `lastFill: '#416B84'` | bar | `aes(fill = month == max(month))` + `scale_fill_manual()` |
+
+The end label shows the last value as the y axis prints it ("7.5M"), or
+the `labelTemplate` text when one is set — `'Prior year'` names a dashed
+reference line in place. It sits above a rising line and below a falling
+one, and steps aside for another end label. `lastFill` colours the last
+bar along the axis: the reporting month among the monthly columns.
+
+```typescript
+.layer({ geom: { type: 'line', color: '#416B84', size: 2, endPoint: true, endLabel: true }, aes: { y: 'ltm' } })
+.layer({ geom: { type: 'bar', color: '#C8C6C4', lastFill: '#416B84' }, aes: { y: 'perMonth' } })
+.layer({ geom: { type: 'line', color: '#8A8886', linetype: 'dashed', endLabel: true, labelTemplate: 'Prior year' }, aes: { y: 'priorYear' } })
+```
+
 **In Power BI:** X Axis / Y Axis → **Position**, **Display units**, **Date
-breaks**, **Label color**; Theme → **Font family**, **Vertical / Horizontal
+breaks**, **Label color**; Layer → Line & Arrow → **End point**, **End
+label** (with **Label template**), Layer → Appearance → **Last bar color**; Theme → **Font family**, **Vertical / Horizontal
 grid lines**, **Minor grid lines**, **Tick marks**; Facets → **Panel
 labels**, **Axes per row**. An axis title of a single space removes the
 title and its room.

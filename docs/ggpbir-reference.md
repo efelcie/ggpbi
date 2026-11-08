@@ -411,7 +411,10 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `repel` | bool | `false` | true/false | no | Text layers: labels find non-overlapping positions (like ggrepel); displaced labels get a connector line |
 | `applyHighlight` | bool | `true` | true/false | no | Whether the Highlight object affects this layer; off = full colours (text layers: all labels) |
 | `filter` | enum | `none` | `none`, `min`, `max`, `extremes` | no | Restrict the layer's rows: Min/Max keep the extreme row per category on the continuous axis, Extremes keeps both (dumbbell ends). Scales still train on the full data |
-| `labelTemplate` | text | `""` | e.g. `{label} {x:.1%}` | no | Text layers: label template — placeholders `{label}`, `{x}`, `{y}`, optional d3-format spec after the colon |
+| `labelTemplate` | text | `""` | e.g. `{label} {x:.1%}` | no | Text layers: label template — placeholders `{label}`, `{x}`, `{y}`, optional d3-format spec after the colon. Line and area layers with `endLabel`: the end label's text (`Prior year`) |
+| `endPoint` | bool | `false` | true/false | no | Line and area layers: a dot at the last point |
+| `endLabel` | bool | `false` | true/false | no | Line and area layers: label the last point in the layer colour — the value as the y axis prints it, or `labelTemplate` |
+| `lastFill` | color | `""` | any colour | no | Bar layers: colour of the last bar along the axis — the reporting month on a time axis (`aes(fill = month == max(month))`) |
 
 ---
 
@@ -2041,6 +2044,8 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
 | `theme.gridX` / `theme.gridY` / `theme.gridMinor` | `panel.grid.major.x/y`, `panel.grid.minor` | Grid switches |
 | `theme.ticks` | `axis.ticks` | Tick marks |
 | `theme.fontFamily` | `base_family` | Font |
+| `layer1.endPoint` / `endLabel` | `geom_point()` / `geom_text()` on `slice_max(.x, x)` | Direct labels at the line end |
+| `layer1.lastFill` | `aes(fill = x == max(x))` + `scale_fill_manual()` | The last bar's colour |
 
 ---
 
