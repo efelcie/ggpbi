@@ -86,6 +86,25 @@ export interface AxisScaleConfig {
    * the locale.
    */
   dateLabels?: 'auto' | 'year' | 'monthYear' | 'monthDay' | 'date' | 'dateTime';
+  /**
+   * Fixed spacing of time-axis breaks, ggplot2's `date_breaks`:
+   * "6 months", "1 year", "2 weeks", "1 day". Unset: d3 picks.
+   */
+  dateBreaks?: string;
+  /**
+   * A fixed display unit for every label — Power BI's "display units",
+   * R's `label_number(scale = 1e-6, suffix = "M")`: 0, 500, 1,000 million
+   * read "0M", "500M", "1,000M". Applies to the `auto` and `thousands`
+   * formats; the suffix follows the locale.
+   */
+  labelUnit?: 'none' | 'thousands' | 'millions' | 'billions';
+  /** Tick label colour (ggplot2 `axis.text.x/y = element_text(colour =)`). */
+  labelColor?: string;
+  /**
+   * Which side the axis sits on — ggplot2's `position`. Y: 'left' (default)
+   * or 'right'.
+   */
+  position?: 'left' | 'right';
 }
 
 export interface ScaleConfig {
@@ -176,6 +195,26 @@ export interface BaseGeomConfig {
   linejoin?: 'round' | 'miter' | 'bevel';
   /** SVG stroke-miterlimit (ggplot2 linemitre). Default: 10. */
   linemitre?: number;
+  /**
+   * Line and area layers: a dot at the last point (ggplot2
+   * `geom_point(data = ~ slice_max(.x, x))`). Default: false.
+   */
+  endPoint?: boolean;
+  /**
+   * Line and area layers: a label at the last point, in the layer colour —
+   * direct labelling instead of reading the axis or a legend. The text is
+   * `labelTemplate` when set ("Prior year", "{y:.3s}"), otherwise the
+   * value formatted like the y axis. Default: false.
+   */
+  endLabel?: boolean;
+  /** Label template for text layers and end labels: '{label} {x:.1%}'. */
+  labelTemplate?: string;
+  /**
+   * Bar layers: the colour of the last bar along the category axis — the
+   * reporting month on a time axis. ggplot2:
+   * `aes(fill = month == max(month))` with a manual scale.
+   */
+  lastFill?: string;
 }
 
 /** Point-specific options. */
@@ -600,6 +639,29 @@ export interface FacetConfig {
    * Default: false (shared scales)
    */
   freeX?: boolean;
+
+  /**
+   * Relative heights of the panel rows, e.g. `[4, 1]`: the first row
+   * four times as tall as the second. Recycled when shorter than the
+   * number of rows, like patchwork's `heights`; the R equivalent is
+   * `ggh4x::force_panelsizes(rows = c(4, 1))`. Default: equal rows.
+   */
+  heights?: number[];
+
+  /**
+   * Draw the strip labels above (and beside) the panels. Default true;
+   * false is ggplot2's `theme(strip.text = element_blank())` — the strips
+   * and their space go.
+   */
+  strips?: boolean;
+
+  /**
+   * Axes per panel row, overriding ggplot2's outer axes: 'x', 'y', 'xy'
+   * or 'none' for each row, e.g. `['xy', 'none']` — the month labels sit
+   * under the first row (between a line panel and a flat bar panel) and
+   * the bar panel shows no scale. Rows without an entry keep the default.
+   */
+  rowAxes?: string[];
 }
 
 export interface SelectionConfig {

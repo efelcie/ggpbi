@@ -48,6 +48,41 @@ describe('number formats', () => {
     expect(formatCompact([1200000], DE)[0]).toMatch(/Mio/);
   });
 
+  it('compact takes its decimals from the breaks, the same within a unit', () => {
+    // scales::label_number(scale_cut = cut_short_scale()): 0.5 had "7M"
+    // next to "7.5M" — same unit, different decimals.
+    expect(formatCompact([0, 2.5e6, 5e6, 7.5e6], EN)).toEqual(['0', '2.5M', '5.0M', '7.5M']);
+    expect(formatCompact([7e6, 7.5e6], EN)).toEqual(['7.0M', '7.5M']);
+  });
+
+  it('compact keeps narrow ranges apart instead of repeating one label', () => {
+    // 0.5 showed "1.3M" five times on a 1.29–1.33 M axis.
+    const labels = formatCompact([1.29e6, 1.3e6, 1.31e6, 1.32e6, 1.33e6], EN);
+    expect(labels).toEqual(['1.29M', '1.30M', '1.31M', '1.32M', '1.33M']);
+    expect(new Set(labels).size).toBe(5);
+  });
+
+  it('compact picks the unit per value and the decimals per unit, like scales', () => {
+    expect(formatCompact([0, 5e5, 1e6, 1.5e6], EN)).toEqual(['0', '500K', '1.0M', '1.5M']);
+    expect(formatCompact([0, 250, 500, 750, 1000], EN)).toEqual(['0', '250', '500', '750', '1K']);
+    expect(formatCompact([1e3, 1e4, 1e5, 1e6], EN)).toEqual(['1K', '10K', '100K', '1M']);
+    expect(formatCompact([-2e6, 0, 2e6], EN)).toEqual(['-2M', '0', '2M']);
+  });
+
+  it('compact never misstates a lone break in its unit', () => {
+    // scales would print "2M" for 2.5M here (a flat facet panel with two breaks).
+    expect(formatCompact([0, 2.5e6], EN)).toEqual(['0', '2.5M']);
+  });
+
+  it('compact follows the locale’s units and decimal mark', () => {
+    // Intl separates number and suffix with a no-break space.
+    expect(formatCompact([7e6, 7.5e6], DE).map(s => s.replace(/ /g, ' ')))
+      .toEqual(['7,0 Mio.', '7,5 Mio.']);
+    // Indian English counts in lakh; the decimals still follow the breaks.
+    expect(formatCompact([1.29e6, 1.3e6, 1.31e6], { locale: 'en-IN' }))
+      .toEqual(['12.9L', '13.0L', '13.1L']);
+  });
+
   it('currency places the symbol the way the locale expects', () => {
     expect(formatCurrency([1000], { ...EN, currency: 'USD' })[0]).toContain('$');
     const de = formatCurrency([1000], { ...DE, currency: 'EUR' })[0];

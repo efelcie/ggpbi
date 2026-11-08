@@ -353,12 +353,21 @@ All property values use Power BI's expression format:
 | String enum | `{ "expr": { "Literal": { "Value": "'value'" } } }` | `"'point'"` |
 | Number | `{ "expr": { "Literal": { "Value": "number" } } }` | `"0.7D"` (`D` = decimal, `L` = whole number; bare `"0.7"` parses too) |
 | Boolean | `{ "expr": { "Literal": { "Value": "bool" } } }` | `"true"` |
-| Color (hex) | `{ "solid": { "color": "#hex" } }` | `"#e74c3c"` |
-| Color (theme) | `{ "solid": { "color": { "ThemeDataColor": { "ColorId": n, "Percent": p } } } }` | `ColorId: 0` |
+| Color (hex) | `{ "solid": { "color": { "expr": { "Literal": { "Value": "'#hex'" } } } } }` | `"'#e74c3c'"` |
+| Color (theme) | `{ "solid": { "color": { "expr": { "ThemeDataColor": { "ColorId": n, "Percent": p } } } } }` | `ColorId: 0` |
 
 **Important:** String values are wrapped in **single quotes** inside the JSON
 string: `"Value": "'point'"` (not `"Value": "point"`). See
 [Rules and Invariants](#rules-and-invariants) for the full encoding contract.
+
+**Colours are expressions, too.** A hex colour in `visual.json` is a quoted
+literal inside `solid.color` — exactly what Power BI Desktop writes. The
+shorter `{ "solid": { "color": "#hex" } }` belongs to report **theme files**
+(`visualStyles`) and to the `persistProperties` API; written into
+`visual.json` it is dropped by the Power BI service, and the chart falls back
+to its default colours (observed with ggpbi 0.5: every layer in the default
+blue). The schema therefore rejects it. Whatever shape does reach the visual
+— resolved, unresolved expression or bare literal — ggpbi applies.
 
 **ThemeDataColor:**
 - `ColorId`: Index in the report theme palette (0 = first color)
@@ -381,7 +390,7 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `type` | enum | `auto` | see [Geom Types](#geom-types) | yes | Geom type |
 | `yField` | enum | `auto` | `auto`, `y1`, `y2`, `y3` | yes | Which Y field this layer uses |
 | `alpha` | number | `0.85` | 0–1 | yes | Transparency |
-| `size` | number | `4` | 1–40 | yes | Point size / line width / font size. The default `4` means "auto": each geom keeps its own default (point 4, line 2, text 12, pointrange 1) — any other value overrides it |
+| `size` | number | `4` | 1–40 | yes | Point size / line width / font size. The default `4` means "auto": each geom keeps its own default (point 4, line 2, text 12, pointrange 1) — any other value overrides it. On an **area** layer it draws the upper edge as a line of that width in the layer colour (ggplot2 `geom_area(colour =, linewidth =)`); `alpha` then thins only the fill |
 | `fill` | color | `""` (auto) | any color | yes | Override color (ignores aes.color) |
 | `lineStyle` | enum | `solid` | see [Line Types](#line-types) | yes | Line dash pattern |
 | `position` | enum | `identity` | see [Position Types](#position-types) | yes | Position adjustment |
@@ -402,7 +411,10 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `repel` | bool | `false` | true/false | no | Text layers: labels find non-overlapping positions (like ggrepel); displaced labels get a connector line |
 | `applyHighlight` | bool | `true` | true/false | no | Whether the Highlight object affects this layer; off = full colours (text layers: all labels) |
 | `filter` | enum | `none` | `none`, `min`, `max`, `extremes` | no | Restrict the layer's rows: Min/Max keep the extreme row per category on the continuous axis, Extremes keeps both (dumbbell ends). Scales still train on the full data |
-| `labelTemplate` | text | `""` | e.g. `{label} {x:.1%}` | no | Text layers: label template — placeholders `{label}`, `{x}`, `{y}`, optional d3-format spec after the colon |
+| `labelTemplate` | text | `""` | e.g. `{label} {x:.1%}` | no | Text layers: label template — placeholders `{label}`, `{x}`, `{y}`, optional d3-format spec after the colon. Line and area layers with `endLabel`: the end label's text (`Prior year`) |
+| `endPoint` | bool | `false` | true/false | no | Line and area layers: a dot at the last point |
+| `endLabel` | bool | `false` | true/false | no | Line and area layers: label the last point in the layer colour — the value as the y axis prints it, or `labelTemplate` |
+| `lastFill` | color | `""` | any colour | no | Bar layers: colour of the last bar along the axis — the reporting month on a time axis (`aes(fill = month == max(month))`) |
 
 ---
 
@@ -412,8 +424,15 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 |----------|------|---------|--------|-------------|
 | `type` | enum | `auto` | see [Scale Types](#scale-types) | Scale transformation. `category` / `ordinal` force a discrete axis (like R's `factor()`) — needed for bars and boxplots over numeric group codes |
 | `label` | text | `""` (field name) | any string | Axis title |
-| `labelFormat` | enum | `auto` | `auto`, `thousands`, `compact`, `currency`, `percent` | Number format for the tick labels. Separators, symbols and compact suffixes follow the report locale — `1200000` renders as `1.2M` (en) or `1,2 Mio.` (de) |
+| `labelFormat` | enum | `auto` | `auto`, `thousands`, `compact`, `currency`, `percent` | Number format for the tick labels. `auto` is ggplot2’s plain look (no group separators), `thousands` groups digits. Separators, symbols and compact suffixes follow the report locale — `1200000` renders as `1.2M` (en) or `1,2 Mio.` (de). Decimals come from the breaks (`scales::precision()`), the same for every label of a unit: `7.0M`, `7.5M` |
 | `dateFormat` | enum | `auto` | `auto`, `year`, `monthYear`, `monthDay`, `date`, `dateTime` | Granularity of a time axis. `auto` follows the tick spacing; month names always come from the report locale |
+| `labelUnit` | enum | `none` | `none`, `thousands`, `millions`, `billions` | One fixed display unit for every label, like Power BI's display units: `0M`, `500M`, `1,500M` (R `label_number(scale = 1e-6, suffix = "M")`). Applies to `auto` and `thousands` (which groups digits); `compact` picks its own units |
+| `dateBreaks` | text | `""` | e.g. `6 months`, `1 year`, `3 months`, `2 weeks` | Fixed spacing of a time axis's labels, ggplot2 `date_breaks`; empty = automatic |
+| `labelColor` | color | `""` | any colour | Tick label colour (ggplot2 `axis.text = element_text(colour =)`); empty = theme |
+| `position` | enum | `left` | `left`, `right` | **scaleY only.** Side of the y axis, ggplot2 `position = "right"` |
+
+A `label` of a single space (`"' '"`) removes the axis title *and its room*
+— ggplot2's `labs(y = NULL)`. An empty label falls back to the field name.
 
 ---
 
@@ -443,7 +462,12 @@ The legend appears automatically when `color` aesthetic is mapped.
 | `gridlineColor` | color | `#FFFFFF` | any color | Grid line color |
 | `ink` | color | `#333333` | any color | Text color (axis labels, titles) |
 | `paper` | color | `#FFFFFF` | any color | Outer background (margins) |
-| `baseSize` | number | `11` | 6–24 | Base font size |
+| `baseSize` | number | `11` | 6–72 | Base font size in px. Pages laid out at 3× device pixels (mobile layouts) need three times the intended size — `40` reads like 13 px on the phone |
+| `fontFamily` | text | `""` | CSS font list | Font for every text (ggplot2 `base_family`); empty = Power BI's Segoe UI |
+| `gridX` | bool | `true` | true/false | Vertical grid lines, major and minor (`panel.grid.major.x`) |
+| `gridY` | bool | `true` | true/false | Horizontal grid lines, major and minor (`panel.grid.major.y`) |
+| `gridMinor` | bool | `true` | true/false | Minor grid lines between the breaks (`panel.grid.minor`) |
+| `ticks` | bool | `true` | true/false | Axis tick marks (`axis.ticks`) |
 
 #### Theme Presets
 
@@ -485,6 +509,14 @@ A field in the **Facet** well becomes `facet_wrap`: a roughly square grid
 | `columns` | number | `0` | 0–12 | Grid columns; `0` = automatic |
 | `freeX` | bool | `false` | true/false | Each panel scales X to its own data (`scales = "free_x"`) |
 | `freeY` | bool | `false` | true/false | Same for the Y axis |
+| `heights` | text | `""` | e.g. `4,1` | Relative row heights, recycled over the rows; empty = equal rows. `4,1` makes a flat second row under a tall first one (patchwork `heights`, `ggh4x::force_panelsizes(rows = c(4, 1))`) |
+| `strips` | bool | `true` | true/false | Strip labels above the panels; `false` removes them and their room (`strip.text = element_blank()`) |
+| `rowAxes` | text | `""` | e.g. `xy,none` | Axes per panel row: `x`, `y`, `xy` or `none`, comma-separated. `xy,none` puts the month labels between a line panel and a flat column panel that shows no scale. Empty = outer axes, like ggplot2 |
+
+Each layer draws the rows where its own Y is non-blank, panels come from
+every layer, and a panel's Y scale trains on all of its layers. The x axis
+sits under the bottom panel of each column and the y axis left of the first
+column unless the scale is free — like ggplot2.
 
 ---
 
@@ -633,7 +665,7 @@ top level; in current reports it lives inside `visual` under this name.)
     "background": [{
       "properties": {
         "show": { "expr": { "Literal": { "Value": "true" } } },
-        "color": { "solid": { "color": "#FFFFFF" } },
+        "color": { "solid": { "color": { "expr": { "Literal": { "Value": "'#FFFFFF'" } } } } },
         "transparency": { "expr": { "Literal": { "Value": "0" } } }
       }
     }]
@@ -704,11 +736,13 @@ carries the type:
 | Decimal | digits, `D` suffix | `"0.6D"`, `"5D"` |
 | Whole number | digits, `L` suffix | `"2024L"` |
 | Boolean | bare | `"true"`, `"false"` |
+| Colour | a string literal inside `{ "solid": { "color": … } }` | `"'#416B84'"` |
 
 Desktop always writes the suffixed number forms; plain digits (`"0.6"`,
 `"20"`) parse too. The classic mistake is `"Value": "point"` — without the
 inner quotes the enum silently fails to match and the property falls back to
-its default.
+its default. Its colour twin is `"color": "#416B84"` without the expression:
+the service drops it, see [Value Encoding](#value-encoding).
 
 ### Structure
 
@@ -841,6 +875,17 @@ the next auto layer.
 "facet": [{ "properties": {
   "columns": { "expr": { "Literal": { "Value": "3D" } } },
   "freeX":   { "expr": { "Literal": { "Value": "false" } } }
+} }]
+```
+
+For a flat panel under a tall one — bars under a line — stack the panels in
+one column and give the rows relative heights:
+
+```json
+"facet": [{ "properties": {
+  "columns": { "expr": { "Literal": { "Value": "1D" } } },
+  "freeY":   { "expr": { "Literal": { "Value": "true" } } },
+  "heights": { "expr": { "Literal": { "Value": "'4,1'" } } }
 } }]
 ```
 
@@ -1331,7 +1376,7 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
             },
             "pointFill": {
               "solid": {
-                "color": "#FFD700"
+                "color": { "expr": { "Literal": { "Value": "'#FFD700'" } } }
               }
             },
             "strokeWidth": {
@@ -1349,22 +1394,22 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
           "properties": {
             "panelFill": {
               "solid": {
-                "color": "#2D2D2D"
+                "color": { "expr": { "Literal": { "Value": "'#2D2D2D'" } } }
               }
             },
             "gridlineColor": {
               "solid": {
-                "color": "#444444"
+                "color": { "expr": { "Literal": { "Value": "'#444444'" } } }
               }
             },
             "ink": {
               "solid": {
-                "color": "#E0E0E0"
+                "color": { "expr": { "Literal": { "Value": "'#E0E0E0'" } } }
               }
             },
             "paper": {
               "solid": {
-                "color": "#1A1A1A"
+                "color": { "expr": { "Literal": { "Value": "'#1A1A1A'" } } }
               }
             },
             "baseSize": {
@@ -1686,7 +1731,7 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
             },
             "fill": {
               "solid": {
-                "color": "#E66C37"
+                "color": { "expr": { "Literal": { "Value": "'#E66C37'" } } }
               }
             }
           }
@@ -1725,7 +1770,7 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
             },
             "fill": {
               "solid": {
-                "color": "#2E7D32"
+                "color": { "expr": { "Literal": { "Value": "'#2E7D32'" } } }
               }
             }
           }
@@ -1987,6 +2032,20 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
 | `theme.ink` | `axis.text`, `axis.title` | Text color |
 | `theme.paper` | `plot.background` | Outer background |
 | `theme.baseSize` | `base_size` | `theme_grey(base_size=)` |
+| `facet.columns` | `facet_wrap(ncol=)` | Grid columns |
+| `facet.freeX` / `facet.freeY` | `facet_wrap(scales=)` | `"free_x"`, `"free_y"`, `"free"` |
+| `facet.heights` | `ggh4x::force_panelsizes(rows=)` | Relative row heights (patchwork `heights`) |
+| `facet.strips` | `theme(strip.text = element_blank())` | `false` = no strip labels |
+| `facet.rowAxes` | — (ggpbi) | Axes per row; R code view: `facet_wrap(row_axes = c("xy", "none"))` |
+| `scaleY.position` | `scale_y_continuous(position=)` | `"right"` |
+| `scaleX.labelUnit` / `scaleY.labelUnit` | `label_number(scale=, suffix=)` | Power BI display units |
+| `scaleX.dateBreaks` | `scale_x_date(date_breaks=)` | Label spacing on a time axis |
+| `scaleX.labelColor` / `scaleY.labelColor` | `theme(axis.text.x/y = element_text(colour=))` | Tick label colour |
+| `theme.gridX` / `theme.gridY` / `theme.gridMinor` | `panel.grid.major.x/y`, `panel.grid.minor` | Grid switches |
+| `theme.ticks` | `axis.ticks` | Tick marks |
+| `theme.fontFamily` | `base_family` | Font |
+| `layer1.endPoint` / `endLabel` | `geom_point()` / `geom_text()` on `slice_max(.x, x)` | Direct labels at the line end |
+| `layer1.lastFill` | `aes(fill = x == max(x))` + `scale_fill_manual()` | The last bar's colour |
 
 ---
 

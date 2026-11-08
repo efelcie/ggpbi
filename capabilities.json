@@ -443,6 +443,17 @@
             }
           }
         },
+        "lastFill": {
+          "displayName": "Last bar color",
+          "description": "Bar layers: colour of the last bar along the axis — the reporting month on a time axis (ggplot2 aes(fill = month == max(month))). Empty = like the others.",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
         "strokeWidth": {
           "displayName": "Stroke width",
           "type": {
@@ -549,6 +560,20 @@
           "displayName": "Arrow angle",
           "type": {
             "numeric": true
+          }
+        },
+        "endPoint": {
+          "displayName": "End point",
+          "description": "Line and area layers: a dot at the last point.",
+          "type": {
+            "bool": true
+          }
+        },
+        "endLabel": {
+          "displayName": "End label",
+          "description": "Line and area layers: label the last point in the layer colour — the value as the y axis prints it, or the Label template text (\"Prior year\").",
+          "type": {
+            "bool": true
           }
         },
         "filter": {
@@ -876,6 +901,17 @@
             }
           }
         },
+        "lastFill": {
+          "displayName": "Last bar color",
+          "description": "Bar layers: colour of the last bar along the axis — the reporting month on a time axis (ggplot2 aes(fill = month == max(month))). Empty = like the others.",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
         "strokeWidth": {
           "displayName": "Stroke width",
           "type": {
@@ -982,6 +1018,20 @@
           "displayName": "Arrow angle",
           "type": {
             "numeric": true
+          }
+        },
+        "endPoint": {
+          "displayName": "End point",
+          "description": "Line and area layers: a dot at the last point.",
+          "type": {
+            "bool": true
+          }
+        },
+        "endLabel": {
+          "displayName": "End label",
+          "description": "Line and area layers: label the last point in the layer colour — the value as the y axis prints it, or the Label template text (\"Prior year\").",
+          "type": {
+            "bool": true
           }
         },
         "filter": {
@@ -1309,6 +1359,17 @@
             }
           }
         },
+        "lastFill": {
+          "displayName": "Last bar color",
+          "description": "Bar layers: colour of the last bar along the axis — the reporting month on a time axis (ggplot2 aes(fill = month == max(month))). Empty = like the others.",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
+          }
+        },
         "strokeWidth": {
           "displayName": "Stroke width",
           "type": {
@@ -1415,6 +1476,20 @@
           "displayName": "Arrow angle",
           "type": {
             "numeric": true
+          }
+        },
+        "endPoint": {
+          "displayName": "End point",
+          "description": "Line and area layers: a dot at the last point.",
+          "type": {
+            "bool": true
+          }
+        },
+        "endLabel": {
+          "displayName": "End label",
+          "description": "Line and area layers: label the last point in the layer colour — the value as the y axis prints it, or the Label template text (\"Prior year\").",
+          "type": {
+            "bool": true
           }
         },
         "filter": {
@@ -1536,6 +1611,30 @@
           },
           "description": "Number format for the tick labels. Separators, symbols and compact suffixes follow the report locale."
         },
+        "labelUnit": {
+          "displayName": "Display units",
+          "description": "One fixed unit for every label, like Power BI display units: 0, 500 M, 1.5 B read \"0M\", \"500M\", \"1,500M\" (R: label_number(scale = 1e-6, suffix = \"M\")). Applies to the Auto and Thousands formats; the suffix follows the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "none",
+                "displayName": "None"
+              },
+              {
+                "value": "thousands",
+                "displayName": "Thousands"
+              },
+              {
+                "value": "millions",
+                "displayName": "Millions"
+              },
+              {
+                "value": "billions",
+                "displayName": "Billions"
+              }
+            ]
+          }
+        },
         "dateFormat": {
           "displayName": "Date format",
           "description": "Granularity for a time axis. Auto follows the tick spacing; month names always come from the report locale.",
@@ -1566,6 +1665,24 @@
                 "displayName": "Date and time"
               }
             ]
+          }
+        },
+        "dateBreaks": {
+          "displayName": "Date breaks",
+          "description": "Fixed spacing of a time axis's labels, ggplot2 date_breaks: \"6 months\", \"1 year\", \"3 months\", \"2 weeks\". Empty = automatic.",
+          "type": {
+            "text": true
+          }
+        },
+        "labelColor": {
+          "displayName": "Label color",
+          "description": "Colour of the tick labels (ggplot2 axis.text = element_text(colour =)). Empty = the theme's axis text colour.",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
           }
         }
       }
@@ -1614,6 +1731,22 @@
             "text": true
           }
         },
+        "position": {
+          "displayName": "Position",
+          "description": "Side of the y axis, ggplot2 scale_y_continuous(position = \"right\").",
+          "type": {
+            "enumeration": [
+              {
+                "value": "left",
+                "displayName": "Left"
+              },
+              {
+                "value": "right",
+                "displayName": "Right"
+              }
+            ]
+          }
+        },
         "labelFormat": {
           "displayName": "Label format",
           "type": {
@@ -1641,6 +1774,30 @@
             ]
           },
           "description": "Number format for the tick labels. Separators, symbols and compact suffixes follow the report locale."
+        },
+        "labelUnit": {
+          "displayName": "Display units",
+          "description": "One fixed unit for every label, like Power BI display units: 0, 500 M, 1.5 B read \"0M\", \"500M\", \"1,500M\" (R: label_number(scale = 1e-6, suffix = \"M\")). Applies to the Auto and Thousands formats; the suffix follows the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "none",
+                "displayName": "None"
+              },
+              {
+                "value": "thousands",
+                "displayName": "Thousands"
+              },
+              {
+                "value": "millions",
+                "displayName": "Millions"
+              },
+              {
+                "value": "billions",
+                "displayName": "Billions"
+              }
+            ]
+          }
         },
         "dateFormat": {
           "displayName": "Date format",
@@ -1672,6 +1829,24 @@
                 "displayName": "Date and time"
               }
             ]
+          }
+        },
+        "dateBreaks": {
+          "displayName": "Date breaks",
+          "description": "Fixed spacing of a time axis's labels, ggplot2 date_breaks: \"6 months\", \"1 year\", \"3 months\", \"2 weeks\". Empty = automatic.",
+          "type": {
+            "text": true
+          }
+        },
+        "labelColor": {
+          "displayName": "Label color",
+          "description": "Colour of the tick labels (ggplot2 axis.text = element_text(colour =)). Empty = the theme's axis text colour.",
+          "type": {
+            "fill": {
+              "solid": {
+                "color": true
+              }
+            }
           }
         }
       }
@@ -2110,8 +2285,44 @@
         },
         "baseSize": {
           "displayName": "Font size",
+          "description": "Base font size in px (ggplot2 base_size); every text size, tick length and margin derives from it. Up to 72 — a page laid out at 3× device pixels needs about 3 × 11 to 3 × 14.",
           "type": {
             "numeric": true
+          }
+        },
+        "fontFamily": {
+          "displayName": "Font family",
+          "description": "Font for every text (ggplot2 base_family). Empty = Power BI's Segoe UI.",
+          "type": {
+            "text": true
+          }
+        },
+        "gridX": {
+          "displayName": "Vertical grid lines",
+          "description": "Grid lines at the x breaks (ggplot2 panel.grid.major.x / minor.x).",
+          "type": {
+            "bool": true
+          }
+        },
+        "gridY": {
+          "displayName": "Horizontal grid lines",
+          "description": "Grid lines at the y breaks (ggplot2 panel.grid.major.y / minor.y).",
+          "type": {
+            "bool": true
+          }
+        },
+        "gridMinor": {
+          "displayName": "Minor grid lines",
+          "description": "Thin grid lines between the breaks (ggplot2 panel.grid.minor).",
+          "type": {
+            "bool": true
+          }
+        },
+        "ticks": {
+          "displayName": "Tick marks",
+          "description": "Tick marks on the axes (ggplot2 axis.ticks).",
+          "type": {
+            "bool": true
           }
         },
         "subtitle": {
@@ -2365,6 +2576,27 @@
           "description": "Each panel scales its Y axis to its own data (ggplot2 scales = \"free_y\").",
           "type": {
             "bool": true
+          }
+        },
+        "heights": {
+          "displayName": "Row heights",
+          "description": "Relative heights of the panel rows, e.g. \"4,1\": the first row four times as tall as the second. Recycled over the rows; empty = equal rows (patchwork heights, ggh4x::force_panelsizes).",
+          "type": {
+            "text": true
+          }
+        },
+        "strips": {
+          "displayName": "Panel labels",
+          "description": "The strip label above each panel (ggplot2 strip.text). Off removes the labels and their space.",
+          "type": {
+            "bool": true
+          }
+        },
+        "rowAxes": {
+          "displayName": "Axes per row",
+          "description": "Axes for each panel row: x, y, xy or none, comma-separated. \"xy,none\" puts the month labels between a line panel and a flat bar panel without a scale. Empty = axes on the outside, like ggplot2.",
+          "type": {
+            "text": true
           }
         }
       }

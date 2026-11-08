@@ -53,7 +53,7 @@ export function linesToScene(
   const defaultAlpha = config.alpha ?? 1;
   const defaultColor = config.color ?? GEOM_DEFAULT_COLOR;
   const strokeWidth = config.size ?? 2;
-  const dasharray = linetypeToDasharray(config.linetype);
+  const dasharray = linetypeToDasharray(config.linetype, config.size ?? 2);
   const lineend = config.lineend ?? 'butt';
   const linejoin = config.linejoin ?? 'round';
   const linemitre = config.linemitre ?? 10;

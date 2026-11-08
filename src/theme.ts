@@ -48,6 +48,24 @@ export interface ThemeConfig {
 
   /** High contrast mode (Power BI accessibility). Thicker strokes and borders. */
   isHighContrast: boolean;
+
+  /** Vertical major grid lines (ggplot2 `panel.grid.major.x`). Default true. */
+  gridX: boolean;
+
+  /** Horizontal major grid lines (ggplot2 `panel.grid.major.y`). Default true. */
+  gridY: boolean;
+
+  /** Minor grid lines between the breaks (ggplot2 `panel.grid.minor`). Default true. */
+  gridMinor: boolean;
+
+  /** Axis tick marks (ggplot2 `axis.ticks`). Default true. */
+  ticks: boolean;
+
+  /**
+   * Font family for every text (ggplot2 `base_family`). Default: Power
+   * BI's own Segoe UI stack, so the chart reads like the report around it.
+   */
+  fontFamily: string;
 }
 
 /** Fully resolved theme with computed values. */
@@ -98,6 +116,13 @@ export interface ResolvedTheme {
   isHighContrast: boolean;
   /** Stroke width on bars/points in HC mode. */
   highContrastStrokeWidth: number;
+
+  // Panel and axis elements
+  gridX: boolean;
+  gridY: boolean;
+  gridMinor: boolean;
+  ticks: boolean;
+  fontFamily: string;
 }
 
 /**
@@ -117,6 +142,9 @@ export const PBI_DEFAULT_PALETTE: string[] = [
   '#D64550', // red
 ];
 
+/** Power BI's report font: what native visuals use for axes and labels. */
+export const DEFAULT_FONT_FAMILY = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
+
 const DEFAULT_CONFIG: ThemeConfig = {
   baseSize: 11,
   axisTextOverlap: 'hide',
@@ -129,6 +157,11 @@ const DEFAULT_CONFIG: ThemeConfig = {
   gridColor: '#ffffff',
   colorPalette: PBI_DEFAULT_PALETTE,
   isHighContrast: false,
+  gridX: true,
+  gridY: true,
+  gridMinor: true,
+  ticks: true,
+  fontFamily: DEFAULT_FONT_FAMILY,
 };
 
 /** Mix two hex colors. ratio=0 → color1, ratio=1 → color2. */
@@ -170,7 +203,9 @@ export function resolveTheme(config: Partial<ThemeConfig> = {}): ResolvedTheme {
     plotCaptionSize: c.baseSize * 0.8,
     legendTextSize: c.baseSize * 0.8,
 
-    tickLength: 0.5 * halfLine,
+    // Without tick marks the labels keep their gap but the tick length
+    // goes (ggplot2: axis.ticks = element_blank()).
+    tickLength: c.ticks ? 0.5 * halfLine : 0,
     axisTextMargin: 0.8 * halfLine / 2,
     axisTitleMargin: halfLine / 2,
 
@@ -194,6 +229,12 @@ export function resolveTheme(config: Partial<ThemeConfig> = {}): ResolvedTheme {
 
     isHighContrast: c.isHighContrast,
     highContrastStrokeWidth: c.isHighContrast ? 2 : 0,
+
+    gridX: c.gridX,
+    gridY: c.gridY,
+    gridMinor: c.gridMinor,
+    ticks: c.ticks,
+    fontFamily: c.fontFamily || DEFAULT_FONT_FAMILY,
   };
 }
 

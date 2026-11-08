@@ -67,15 +67,15 @@ var bisect_default = bisectRight;
 // node_modules/d3-array/src/extent.js
 function extent(values, valueof) {
   let min2;
-  let max2;
+  let max3;
   if (valueof === void 0) {
     for (const value of values) {
       if (value != null) {
         if (min2 === void 0) {
-          if (value >= value) min2 = max2 = value;
+          if (value >= value) min2 = max3 = value;
         } else {
           if (min2 > value) min2 = value;
-          if (max2 < value) max2 = value;
+          if (max3 < value) max3 = value;
         }
       }
     }
@@ -84,15 +84,15 @@ function extent(values, valueof) {
     for (let value of values) {
       if ((value = valueof(value, ++index2, values)) != null) {
         if (min2 === void 0) {
-          if (value >= value) min2 = max2 = value;
+          if (value >= value) min2 = max3 = value;
         } else {
           if (min2 > value) min2 = value;
-          if (max2 < value) max2 = value;
+          if (max3 < value) max3 = value;
         }
       }
     }
   }
-  return [min2, max2];
+  return [min2, max3];
 }
 
 // node_modules/internmap/src/index.js
@@ -215,6 +215,26 @@ function tickStep(start2, stop, count) {
   return (reverse ? -1 : 1) * (inc < 0 ? 1 / -inc : inc);
 }
 
+// node_modules/d3-array/src/max.js
+function max(values, valueof) {
+  let max3;
+  if (valueof === void 0) {
+    for (const value of values) {
+      if (value != null && (max3 < value || max3 === void 0 && value >= value)) {
+        max3 = value;
+      }
+    }
+  } else {
+    let index2 = -1;
+    for (let value of values) {
+      if ((value = valueof(value, ++index2, values)) != null && (max3 < value || max3 === void 0 && value >= value)) {
+        max3 = value;
+      }
+    }
+  }
+  return max3;
+}
+
 // node_modules/d3-array/src/quantile.js
 function quantileSorted(values, p, valueof = number) {
   if (!(n = values.length) || isNaN(p = +p)) return;
@@ -326,6 +346,9 @@ function axis(orient, scale) {
     return arguments.length ? (offset = +_, axis2) : offset;
   };
   return axis2;
+}
+function axisRight(scale) {
+  return axis(right, scale);
 }
 function axisBottom(scale) {
   return axis(bottom, scale);
@@ -1506,12 +1529,12 @@ function hslConvert(o) {
   if (!o) return new Hsl();
   if (o instanceof Hsl) return o;
   o = o.rgb();
-  var r = o.r / 255, g = o.g / 255, b = o.b / 255, min2 = Math.min(r, g, b), max2 = Math.max(r, g, b), h = NaN, s = max2 - min2, l = (max2 + min2) / 2;
+  var r = o.r / 255, g = o.g / 255, b = o.b / 255, min2 = Math.min(r, g, b), max3 = Math.max(r, g, b), h = NaN, s = max3 - min2, l = (max3 + min2) / 2;
   if (s) {
-    if (r === max2) h = (g - b) / s + (g < b) * 6;
-    else if (g === max2) h = (b - r) / s + 2;
+    if (r === max3) h = (g - b) / s + (g < b) * 6;
+    else if (g === max3) h = (b - r) / s + 2;
     else h = (r - g) / s + 4;
-    s /= l < 0.5 ? max2 + min2 : 2 - max2 - min2;
+    s /= l < 0.5 ? max3 + min2 : 2 - max3 - min2;
     h *= 60;
   } else {
     s = l > 0 && l < 1 ? 0 : h;
@@ -2666,7 +2689,7 @@ selection_default.prototype.interrupt = interrupt_default2;
 selection_default.prototype.transition = transition_default2;
 
 // node_modules/d3-brush/src/brush.js
-var { abs, max, min } = Math;
+var { abs, max: max2, min } = Math;
 function number1(e) {
   return [+e[0], +e[1]];
 }
@@ -3037,9 +3060,9 @@ function precisionPrefix_default(step, value) {
 }
 
 // node_modules/d3-format/src/precisionRound.js
-function precisionRound_default(step, max2) {
-  step = Math.abs(step), max2 = Math.abs(max2) - step;
-  return Math.max(0, exponent_default(max2) - exponent_default(step)) + 1;
+function precisionRound_default(step, max3) {
+  step = Math.abs(step), max3 = Math.abs(max3) - step;
+  return Math.max(0, exponent_default(max3) - exponent_default(step)) + 1;
 }
 
 // node_modules/d3-scale/src/init.js
@@ -4858,7 +4881,7 @@ function breakDecimals(breaks) {
     if (d > 0 && d < smallestDiff) smallestDiff = d;
   }
   if (smallestDiff < Math.sqrt(Number.EPSILON)) return 1;
-  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff)) - 1);
+  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff) + 1e-9) - 1);
   if (unique.every((v) => Math.round(v / p) % 10 === 0)) p *= 10;
   p = Math.min(p, 1);
   return Math.max(0, -Math.floor(Math.log10(p)));
@@ -4895,13 +4918,105 @@ function formatThousands(breaks, opts = {}) {
   });
   return breaks.map((v) => nf.format(v));
 }
+function compactScale(v, probe) {
+  if (v === 0 || !Number.isFinite(v)) return 1;
+  let digits = "";
+  for (const part of probe.formatToParts(v)) {
+    if (part.type === "integer") digits += part.value;
+    else if (part.type === "decimal") digits += ".";
+    else if (part.type === "fraction") digits += part.value;
+  }
+  const shown = Math.abs(Number(digits));
+  if (!Number.isFinite(shown) || shown === 0) return 1;
+  return Math.pow(10, Math.round(Math.log10(Math.abs(v) / shown)));
+}
 function formatCompact(breaks, opts = {}) {
-  const nf = intl(opts.locale, {
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 1
+  let probe;
+  try {
+    probe = new Intl.NumberFormat(opts.locale, {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 20,
+      numberingSystem: "latn"
+    });
+  } catch {
+    probe = new Intl.NumberFormat(void 0, {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 20,
+      numberingSystem: "latn"
+    });
+  }
+  const scales = breaks.map((v) => compactScale(v, probe));
+  const groups2 = /* @__PURE__ */ new Map();
+  breaks.forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
+    const scaled = v / scales[i];
+    const group2 = groups2.get(scales[i]);
+    if (group2) group2.push(scaled);
+    else groups2.set(scales[i], [scaled]);
   });
-  return breaks.map((v) => nf.format(v));
+  const exactDecimals = (v) => {
+    for (let d = 0; d < 3; d++) {
+      const f = Math.pow(10, d);
+      if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
+    }
+    return 3;
+  };
+  const decimalsOf = /* @__PURE__ */ new Map();
+  for (const [scale, values] of groups2) {
+    decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
+  }
+  const formatters = /* @__PURE__ */ new Map();
+  const formatterFor = (decimals) => {
+    let nf = formatters.get(decimals);
+    if (!nf) {
+      nf = intl(opts.locale, {
+        notation: "compact",
+        compactDisplay: "short",
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+      formatters.set(decimals, nf);
+    }
+    return nf;
+  };
+  return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
+}
+var UNIT_SCALE = {
+  thousands: 1e3,
+  millions: 1e6,
+  billions: 1e9
+};
+var UNIT_FALLBACK = {
+  thousands: "K",
+  millions: "M",
+  billions: "B"
+};
+function unitSuffix(unit2, locale3) {
+  try {
+    const parts = new Intl.NumberFormat(locale3, { notation: "compact", compactDisplay: "short" }).formatToParts(UNIT_SCALE[unit2]);
+    const i = parts.findIndex((p) => p.type === "compact");
+    if (i >= 0) {
+      const before = i > 0 && parts[i - 1].type === "literal" ? parts[i - 1].value : "";
+      const integer = parts.filter((p) => p.type === "integer").map((p) => p.value).join("");
+      if (integer === "1") return before + parts[i].value;
+    }
+  } catch {
+  }
+  return UNIT_FALLBACK[unit2];
+}
+function formatInUnit(breaks, unit2, opts = {}, grouping = false) {
+  const scale = UNIT_SCALE[unit2];
+  const scaled = breaks.map((v) => v / scale);
+  const decimals = breakDecimals(scaled);
+  const nf = intl(opts.locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: grouping
+  });
+  const suffix = unitSuffix(unit2, opts.locale);
+  return scaled.map((v) => nf.format(v) + suffix);
 }
 function formatCurrency(breaks, opts = {}) {
   const decimals = Math.min(breakDecimals(breaks), 2);
@@ -5082,6 +5197,9 @@ function formatBreaks(breaks) {
 }
 function formatBreaksAs(breaks, format2, opts = {}) {
   if (typeof format2 === "function") return breaks.map((v) => format2(v));
+  if (opts.unit && opts.unit !== "none" && (!format2 || format2 === "auto" || format2 === "thousands")) {
+    return formatInUnit(breaks, opts.unit, opts, format2 === "thousands");
+  }
   switch (format2) {
     case "percent":
       return formatPercent(breaks, opts);
@@ -5178,21 +5296,29 @@ function filterNA(points, naRm = false, geomName = "geom", fields = ["x", "y"]) 
   }
   return filtered;
 }
-function linetypeToDasharray(linetype) {
+function linetypeToDasharray(linetype, lineWidth) {
+  let pattern;
   switch (linetype) {
     case "dashed":
-      return "6 4";
+      pattern = [6, 4];
+      break;
     case "dotted":
-      return "2 3";
+      pattern = [2, 3];
+      break;
     case "dashdot":
-      return "6 3 2 3";
+      pattern = [6, 3, 2, 3];
+      break;
     case "longdash":
-      return "10 4";
+      pattern = [10, 4];
+      break;
     case "twodash":
-      return "2 2 8 2";
+      pattern = [2, 2, 8, 2];
+      break;
     default:
       return null;
   }
+  const k = lineWidth !== void 0 && lineWidth > 2 ? lineWidth / 2 : 1;
+  return pattern.map((v) => Math.round(v * k * 100) / 100).join(" ");
 }
 function bandOffset(scale) {
   return typeof scale.bandwidth === "function" ? scale.bandwidth() / 2 : 0;
@@ -5399,7 +5525,7 @@ function linesToScene(points, xScale, yScale, config, colorScale) {
   const defaultAlpha = config.alpha ?? 1;
   const defaultColor = config.color ?? GEOM_DEFAULT_COLOR;
   const strokeWidth = config.size ?? 2;
-  const dasharray = linetypeToDasharray(config.linetype);
+  const dasharray = linetypeToDasharray(config.linetype, config.size ?? 2);
   const lineend = config.lineend ?? "butt";
   const linejoin = config.linejoin ?? "round";
   const linemitre = config.linemitre ?? 10;
@@ -5567,8 +5693,15 @@ function barsToScene(points, xScale, yScale, config, colorScale, innerWidth) {
     dodgePadding = padded ? baseBandWidth / nColors * 0.1 : 0;
     dodgeWidth = (baseBandWidth - dodgePadding * (nColors - 1)) / nColors;
   }
+  const lastCatPx = config.lastFill ? max(catPositions.map((p) => isHorizontal ? -p : p).filter(Number.isFinite)) : void 0;
+  const isLast = (d) => {
+    if (lastCatPx === void 0) return false;
+    const p = Number(catScale(isHorizontal ? d.y : d.x));
+    return Number.isFinite(p) && Math.abs((isHorizontal ? -p : p) - lastCatPx) < 1e-6;
+  };
   for (const d of barPoints) {
     const style = computeBarStyle(d, config, colorScale);
+    if (config.lastFill && isLast(d)) style.fill = config.lastFill;
     const aria = { role: "listitem", tabindex: "0", label: barAriaLabel(d, isHorizontal) };
     let x2, y2, width, height;
     if (position === "dodge" || position === "dodge2") {
@@ -5625,34 +5758,51 @@ function areaToScene(points, xScale, yScale, config, colorScale) {
   const defaultColor = config.color ?? GEOM_DEFAULT_COLOR;
   const bw = bandOffset(xScale);
   const area = area_default().x((d) => xScale(d.x) + bw).y0(yScale(0)).y1((d) => yScale(d.y));
-  const buildNode = (pts, color2) => {
+  const outlineWidth = config.size;
+  const upper = line_default().x((d) => xScale(d.x) + bw).y((d) => yScale(d.y));
+  const dasharray = linetypeToDasharray(config.linetype, outlineWidth);
+  const buildNodes = (pts, color2) => {
     const sorted = sortByX(pts);
     const pathD = area(sorted) ?? "";
-    if (!pathD) return null;
+    if (!pathD) return [];
     const style = {
       fill: color2,
       opacity: defaultAlpha
     };
-    return {
+    const nodes = [{
       type: "path",
       class: "ggpbi-area",
       d: pathD,
       style,
       data: sorted[0]
       // first point as representative
-    };
+    }];
+    if (outlineWidth !== void 0 && outlineWidth > 0) {
+      nodes.push({
+        type: "path",
+        class: "ggpbi-area-outline",
+        d: upper(sorted) ?? "",
+        style: {
+          fill: "none",
+          stroke: color2,
+          strokeWidth: outlineWidth,
+          strokeLinejoin: "round",
+          ...dasharray && { strokeDasharray: dasharray }
+        },
+        data: sorted[0]
+      });
+    }
+    return nodes;
   };
   const result = [];
   const groups2 = groupByColor(areaPoints);
   if (groups2) {
     groups2.forEach((groupPoints, key) => {
       const color2 = colorScale ? colorScale(String(key)) : defaultColor;
-      const node = buildNode(groupPoints, color2);
-      if (node) result.push(node);
+      result.push(...buildNodes(groupPoints, color2));
     });
   } else {
-    const node = buildNode(areaPoints, defaultColor);
-    if (node) result.push(node);
+    result.push(...buildNodes(areaPoints, defaultColor));
   }
   return result;
 }
@@ -7550,6 +7700,220 @@ var sceneBuilders = {
   pointrange: (pts, xs, ys, cfg, cs) => pointrangeToScene(pts, xs, ys, cfg, cs)
 };
 
+// src/position.ts
+function applyDodge(points, padded = false) {
+  const colorGroups = Array.from(
+    new Set(points.map((d) => String(d.color ?? "__none__")))
+  );
+  const nColors = colorGroups.length;
+  return points.map((d) => ({
+    ...d,
+    _dodgeIndex: colorGroups.indexOf(String(d.color ?? "__none__")),
+    _dodgeN: nColors,
+    _dodgePadded: padded
+  }));
+}
+function applyStack(points, orientation = "x") {
+  const isHorizontal = orientation === "y";
+  const catKey = (d) => String(isHorizontal ? d.y : d.x);
+  const seriesKey = (d) => `${String(d.group ?? "")}|${String(d.color ?? "")}`;
+  const groups2 = /* @__PURE__ */ new Map();
+  for (const d of points) {
+    const key = catKey(d);
+    if (!groups2.has(key)) groups2.set(key, []);
+    groups2.get(key).push(d);
+  }
+  const seriesOrder = /* @__PURE__ */ new Map();
+  for (const d of points) {
+    const key = seriesKey(d);
+    if (!seriesOrder.has(key)) seriesOrder.set(key, seriesOrder.size);
+  }
+  if (seriesOrder.size > 1) {
+    for (const group2 of groups2.values()) {
+      group2.sort((a, b) => seriesOrder.get(seriesKey(a)) - seriesOrder.get(seriesKey(b)));
+    }
+  }
+  const result = new Array(points.length);
+  const pointIndex = /* @__PURE__ */ new Map();
+  for (let i = 0; i < points.length; i++) {
+    pointIndex.set(points[i], i);
+  }
+  for (const [, group2] of groups2) {
+    let cumPos = 0;
+    let cumNeg = 0;
+    for (const d of group2) {
+      const val = Number(isHorizontal ? d.x : d.y);
+      const idx = pointIndex.get(d);
+      if (!Number.isFinite(val)) {
+        result[idx] = { ...d, _v0: cumPos, _v1: cumPos };
+        continue;
+      }
+      if (val >= 0) {
+        result[idx] = { ...d, _v0: cumPos, _v1: cumPos + val };
+        cumPos += val;
+      } else {
+        result[idx] = { ...d, _v0: cumNeg + val, _v1: cumNeg };
+        cumNeg += val;
+      }
+    }
+  }
+  return result;
+}
+function applyFill(points, orientation = "x") {
+  const stacked = applyStack(points, orientation);
+  const isHorizontal = orientation === "y";
+  const catKey = (d) => String(isHorizontal ? d.y : d.x);
+  const posTotal = /* @__PURE__ */ new Map();
+  const negTotal = /* @__PURE__ */ new Map();
+  for (const d of stacked) {
+    const key = catKey(d);
+    const v1 = d._v1;
+    const v0 = d._v0;
+    if (v1 > 0) posTotal.set(key, Math.max(posTotal.get(key) ?? 0, v1));
+    if (v0 < 0) negTotal.set(key, Math.min(negTotal.get(key) ?? 0, v0));
+  }
+  return stacked.map((d) => {
+    const key = catKey(d);
+    const v0 = d._v0;
+    const v1 = d._v1;
+    if (v1 > 0 && v0 >= 0) {
+      const total = posTotal.get(key) ?? 1;
+      if (total === 0) return d;
+      return { ...d, _v0: v0 / total, _v1: v1 / total };
+    } else if (v0 < 0 && v1 <= 0) {
+      const total = Math.abs(negTotal.get(key) ?? -1);
+      if (total === 0) return d;
+      return { ...d, _v0: v0 / total, _v1: v1 / total };
+    }
+    return d;
+  });
+}
+function computePosition(points, geom) {
+  const position = geom.position ?? "stack";
+  const orientation = ("orientation" in geom ? geom.orientation : void 0) ?? "x";
+  switch (position) {
+    case "dodge":
+      return applyDodge(points);
+    case "dodge2":
+      return applyDodge(points, true);
+    case "stack":
+      return applyStack(points, orientation);
+    case "fill":
+      return applyFill(points, orientation);
+    case "identity":
+    case "jitter":
+      return points.map((d) => ({ ...d }));
+  }
+}
+
+// src/facet-layout.ts
+function parseRowAxes(entry) {
+  if (typeof entry !== "string") return void 0;
+  const e = entry.trim().toLowerCase();
+  if (e === "") return void 0;
+  if (e === "none" || e === "-") return { x: false, y: false };
+  if (!/^[xy]+$/.test(e)) return void 0;
+  return { x: e.includes("x"), y: e.includes("y") };
+}
+function facetDims(facet, data) {
+  const levelSort = (a, b) => {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  };
+  const levels = (field) => Array.from(new Set(data.map((d) => String(d[field])))).sort(levelSort);
+  const wrapLevels = facet.wrap ? levels(facet.wrap) : [];
+  const rowLevels = !facet.wrap && facet.row ? levels(facet.row) : [""];
+  const colLevels = !facet.wrap && facet.col ? levels(facet.col) : [""];
+  if (facet.wrap) {
+    const n = wrapLevels.length;
+    let nCols = facet.ncol ?? (facet.nrow ? Math.ceil(n / facet.nrow) : Math.ceil(Math.sqrt(n)));
+    nCols = Math.max(1, Math.min(nCols, n));
+    return { wrapLevels, rowLevels, colLevels, nRows: Math.max(1, Math.ceil(n / nCols)), nCols };
+  }
+  return {
+    wrapLevels,
+    rowLevels,
+    colLevels,
+    nRows: Math.max(1, rowLevels.length),
+    nCols: Math.max(1, colLevels.length)
+  };
+}
+function rowWeights(nRows, heights) {
+  const valid = (heights ?? []).filter((h) => Number.isFinite(h) && h > 0);
+  if (valid.length === 0) return Array.from({ length: nRows }, () => 1);
+  return Array.from({ length: nRows }, (_, r) => valid[r % valid.length]);
+}
+function layoutFacetGrid(input) {
+  const { nRows, nCols, present, innerWidth, innerHeight: innerHeight2, metrics } = input;
+  const right2 = input.yAxisSide === "right";
+  const outerCol = right2 ? nCols - 1 : 0;
+  const override = (r) => input.rowAxes?.[r];
+  const showX = (r, c) => override(r)?.x ?? (input.freeX || r === nRows - 1 || !present(r + 1, c));
+  const showY = (r, c) => override(r)?.y ?? (input.freeY || c === outerCol);
+  const xAxisRoom = (r) => {
+    if (r >= nRows - 1) return 0;
+    for (let c = 0; c < nCols; c++) {
+      if (present(r, c) && showX(r, c) && present(r + 1, c)) return metrics.xAxis;
+    }
+    return 0;
+  };
+  const yAxisRoom = (c) => {
+    if (c === outerCol) return 0;
+    for (let r = 0; r < nRows; r++) {
+      if (present(r, c) && showY(r, c)) return input.yAxisWidth(c);
+    }
+    return 0;
+  };
+  const stripAbove = (r) => input.stripAbove(r) ? metrics.strip : 0;
+  const extraOuter = Math.max(0, input.yAxisWidth(outerCol) - input.reservedLeft);
+  const stripRight = input.stripRight ? metrics.strip : 0;
+  let interiorY = 0;
+  for (let c = 0; c < nCols; c++) interiorY += yAxisRoom(c);
+  const colGap = metrics.colSpacing ?? metrics.spacing;
+  const availW = innerWidth - extraOuter - interiorY - colGap * (nCols - 1) - stripRight;
+  const panelW = Math.max(1, availW / nCols);
+  let fixedH = metrics.spacing * (nRows - 1);
+  for (let r = 0; r < nRows; r++) fixedH += stripAbove(r) + xAxisRoom(r);
+  const availH = Math.max(nRows, innerHeight2 - fixedH);
+  const weights = rowWeights(nRows, input.heights);
+  const total = weights.reduce((a, w) => a + w, 0);
+  const rowH = weights.map((w) => Math.max(1, availH * w / total));
+  const colX = [];
+  let x2 = right2 ? 0 : extraOuter;
+  for (let c = 0; c < nCols; c++) {
+    if (!right2) x2 += yAxisRoom(c);
+    colX.push(x2);
+    x2 += panelW + colGap;
+    if (right2) x2 += yAxisRoom(c);
+  }
+  const rowY = [];
+  let y2 = 0;
+  for (let r = 0; r < nRows; r++) {
+    y2 += stripAbove(r);
+    rowY.push(y2);
+    y2 += rowH[r] + xAxisRoom(r) + metrics.spacing;
+  }
+  const cells = [];
+  for (let r = 0; r < nRows; r++) {
+    for (let c = 0; c < nCols; c++) {
+      if (!present(r, c)) continue;
+      cells.push({
+        r,
+        c,
+        x: colX[c],
+        y: rowY[r],
+        width: panelW,
+        height: rowH[r],
+        showXAxis: showX(r, c),
+        showYAxis: showY(r, c)
+      });
+    }
+  }
+  return cells;
+}
+
 // src/tooltip.ts
 var Tooltip = class {
   constructor(container, config = {}, aes = {}) {
@@ -8162,6 +8526,7 @@ var PBI_DEFAULT_PALETTE = [
   "#D64550"
   // red
 ];
+var DEFAULT_FONT_FAMILY = "'Segoe UI', wf_segoe-ui_normal, helvetica, arial, sans-serif";
 var DEFAULT_CONFIG = {
   baseSize: 11,
   axisTextOverlap: "hide",
@@ -8173,7 +8538,12 @@ var DEFAULT_CONFIG = {
   panelFill: "#EBEBEB",
   gridColor: "#ffffff",
   colorPalette: PBI_DEFAULT_PALETTE,
-  isHighContrast: false
+  isHighContrast: false,
+  gridX: true,
+  gridY: true,
+  gridMinor: true,
+  ticks: true,
+  fontFamily: DEFAULT_FONT_FAMILY
 };
 function mixColor(hex1, hex2, ratio) {
   const parse = (h) => {
@@ -8205,7 +8575,9 @@ function resolveTheme(config = {}) {
     plotTitleSize: c.baseSize * 1.2,
     plotCaptionSize: c.baseSize * 0.8,
     legendTextSize: c.baseSize * 0.8,
-    tickLength: 0.5 * halfLine,
+    // Without tick marks the labels keep their gap but the tick length
+    // goes (ggplot2: axis.ticks = element_blank()).
+    tickLength: c.ticks ? 0.5 * halfLine : 0,
     axisTextMargin: 0.8 * halfLine / 2,
     axisTitleMargin: halfLine / 2,
     margin,
@@ -8222,7 +8594,12 @@ function resolveTheme(config = {}) {
     pointSize: c.baseSize / 11 * 1.5,
     colorPalette: c.colorPalette,
     isHighContrast: c.isHighContrast,
-    highContrastStrokeWidth: c.isHighContrast ? 2 : 0
+    highContrastStrokeWidth: c.isHighContrast ? 2 : 0,
+    gridX: c.gridX,
+    gridY: c.gridY,
+    gridMinor: c.gridMinor,
+    ticks: c.ticks,
+    fontFamily: c.fontFamily || DEFAULT_FONT_FAMILY
   };
 }
 function axisLabelPriority(n) {
@@ -8372,6 +8749,25 @@ function renderSceneNodes(g, nodes) {
 }
 
 // src/panel.ts
+function parseDateBreaks(text) {
+  if (!text) return void 0;
+  const m = /^\s*(\d+)?\s*(day|week|month|quarter|year)s?\s*$/i.exec(text);
+  if (!m) return void 0;
+  const n = Math.max(1, Number(m[1] ?? 1));
+  switch (m[2].toLowerCase()) {
+    case "day":
+      return timeDay.every(n) ?? void 0;
+    case "week":
+      return timeSunday.every(n) ?? void 0;
+    case "month":
+      return timeMonth.every(n) ?? void 0;
+    case "quarter":
+      return timeMonth.every(3 * n) ?? void 0;
+    case "year":
+      return timeYear.every(n) ?? void 0;
+  }
+  return void 0;
+}
 var clipCounter = 0;
 function nextClipId(suffix) {
   clipCounter += 1;
@@ -8384,7 +8780,8 @@ function ggBreaks(scale, nBreaks, labelFormat, fmt = {}) {
   if (dom.length < 2) return void 0;
   if (dom[0] instanceof Date || dom[1] instanceof Date) {
     if (typeof scale.ticks !== "function") return void 0;
-    const dateTicks = scale.ticks(nBreaks);
+    const interval2 = parseDateBreaks(fmt.dateBreaks);
+    const dateTicks = interval2 ? scale.ticks(interval2) : scale.ticks(nBreaks);
     if (dateTicks.length === 0) return void 0;
     return { ticks: dateTicks, labels: formatDates(dateTicks, fmt.dateFormat, fmt) };
   }
@@ -8426,6 +8823,67 @@ function applyOverlapCheck(axisGroup, direction) {
     }
   }
 }
+function formatLikeAxis(value, ticks2, labelFormat, fmt) {
+  const finite = [...new Set(ticks2.filter(Number.isFinite))].sort((a, b) => a - b);
+  let rounded = value;
+  if (finite.length >= 2) {
+    let diff = Infinity;
+    for (let i = 1; i < finite.length; i++) diff = Math.min(diff, finite[i] - finite[i - 1]);
+    if (diff > 0 && Number.isFinite(diff)) {
+      let p = Math.pow(10, Math.floor(Math.log10(diff) + 1e-9) - 1);
+      if (finite.every((t2) => Math.round(t2 / p) % 10 === 0)) p *= 10;
+      rounded = Math.round(value / p) * p;
+    }
+  }
+  const labels = formatBreaksAs([...finite, rounded], labelFormat, fmt);
+  return labels[labels.length - 1];
+}
+function drawEndMarks(ctx, yTicks) {
+  const { panelG, xScale, yScale, theme: theme2, geoms, layerData, colorScale, innerHeight: innerHeight2 } = ctx;
+  const xo = bandOffset(xScale);
+  const yo = bandOffset(yScale);
+  const fontSize = theme2.axisTextSize;
+  const placed = [];
+  const numericTicks = yTicks.filter((t2) => typeof t2 === "number");
+  let group2;
+  geoms.forEach((geom, li) => {
+    if (geom.type !== "line" && geom.type !== "area") return;
+    if (!geom.endPoint && !geom.endLabel) return;
+    const px = (p) => Number(xScale(p.x)) + xo;
+    const py = (p) => Number(yScale(p.y)) + yo;
+    const pts = (layerData[li] ?? []).filter((p) => p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
+    const groups2 = group(pts, (p) => p.color === void 0 ? "" : String(p.color));
+    for (const [key, groupPts] of groups2) {
+      const sorted = [...groupPts].sort((a, b2) => px(a) - px(b2));
+      const last = sorted[sorted.length - 1];
+      const prev = sorted[sorted.length - 2];
+      if (!last) continue;
+      const color2 = key !== "" && colorScale ? colorScale(key) : geom.color ?? GEOM_DEFAULT_COLOR;
+      const x2 = px(last);
+      const y2 = py(last);
+      group2 ??= panelG.append("g").attr("class", "ggpbi-end-marks");
+      const lineWidth = geom.size ?? 2;
+      const r = Math.max(2.5, lineWidth * 1.4);
+      if (geom.endPoint) {
+        group2.append("circle").attr("class", "ggpbi-end-point").attr("cx", x2).attr("cy", y2).attr("r", r).attr("fill", color2);
+      }
+      if (!geom.endLabel) continue;
+      const text = geom.labelTemplate ? renderLabelTemplate(geom.labelTemplate, last) : typeof last.y === "number" ? formatLikeAxis(last.y, numericTicks, ctx.yLabelFormat, { ...ctx.format, unit: ctx.yLabelUnit }) : String(last.y);
+      if (!text) continue;
+      const w = text.length * fontSize * 0.6;
+      const gap = (geom.endPoint ? r : lineWidth / 2) + fontSize * 0.35;
+      const box = (above2) => above2 ? { x0: x2 - w, x1: x2, y0: y2 - gap - fontSize, y1: y2 - gap } : { x0: x2 - w, x1: x2, y0: y2 + gap, y1: y2 + gap + fontSize };
+      let above = !prev || py(prev) >= y2;
+      if (above && box(true).y0 < -theme2.halfLine * 2) above = false;
+      else if (!above && box(false).y1 > innerHeight2) above = true;
+      const hits = (b2) => placed.some((q2) => b2.x0 < q2.x1 && b2.x1 > q2.x0 && b2.y0 < q2.y1 && b2.y1 > q2.y0);
+      if (hits(box(above)) && !hits(box(!above))) above = !above;
+      const b = box(above);
+      placed.push(b);
+      group2.append("text").attr("class", "ggpbi-end-label").attr("x", x2).attr("y", b.y1 - fontSize * 0.2).attr("text-anchor", "end").attr("font-size", `${fontSize}px`).attr("font-weight", geom.labelTemplate ? 400 : 600).attr("fill", color2).text(text);
+    }
+  });
+}
 function renderPanel(ctx) {
   const { panelG, svg, innerWidth, innerHeight: innerHeight2, xScale, yScale, theme: theme2, colorScale, geoms, layerData } = ctx;
   panelG.insert("rect", ":first-child").attr("class", "ggpbi-panel").attr("width", innerWidth).attr("height", innerHeight2).attr("fill", theme2.panelFill);
@@ -8433,31 +8891,31 @@ function renderPanel(ctx) {
     xScale,
     theme2.nBreaks,
     ctx.xLabelFormat,
-    { ...ctx.format, dateFormat: ctx.xDateFormat }
+    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit }
   );
   const yBreaks = ggBreaks(
     yScale,
     theme2.nBreaks,
     ctx.yLabelFormat,
-    { ...ctx.format, dateFormat: ctx.yDateFormat }
+    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit }
   );
   const isBandX = typeof xScale.bandwidth === "function";
   const xTicks = isBandX ? [] : xBreaks?.ticks ?? (xScale.ticks ? xScale.ticks(theme2.nBreaks) : []);
   const yTicks = yBreaks?.ticks ?? (yScale.ticks ? yScale.ticks(theme2.nBreaks) : []);
   const yDom = yScale.domain?.();
   const xDom = xScale.domain?.();
-  const yMinor = yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
-  const xMinor = isBandX ? [] : xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : [];
+  const yMinor = theme2.gridY && theme2.gridMinor && yDom ? minorBreaks(yTicks, yDom[0], yDom[1]) : [];
+  const xMinor = isBandX || !theme2.gridX || !theme2.gridMinor ? [] : xDom ? minorBreaks(xTicks, xDom[0], xDom[1]) : [];
   for (const tick of yMinor) {
     panelG.append("line").attr("class", "ggpbi-grid-minor").attr("x1", 0).attr("x2", innerWidth).attr("y1", yScale(tick)).attr("y2", yScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize * 0.5);
   }
   for (const tick of xMinor) {
     panelG.append("line").attr("class", "ggpbi-grid-minor").attr("y1", 0).attr("y2", innerHeight2).attr("x1", xScale(tick)).attr("x2", xScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize * 0.5);
   }
-  for (const tick of yTicks) {
+  for (const tick of theme2.gridY ? yTicks : []) {
     panelG.append("line").attr("class", "ggpbi-grid").attr("x1", 0).attr("x2", innerWidth).attr("y1", yScale(tick)).attr("y2", yScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize);
   }
-  for (const tick of xTicks) {
+  for (const tick of theme2.gridX ? xTicks : []) {
     panelG.append("line").attr("class", "ggpbi-grid").attr("y1", 0).attr("y2", innerHeight2).attr("x1", xScale(tick)).attr("x2", xScale(tick)).attr("stroke", theme2.gridColor).attr("stroke-width", theme2.baseLineSize);
   }
   const clipId = nextClipId(ctx.clipSuffix ?? "panel");
@@ -8469,18 +8927,23 @@ function renderPanel(ctx) {
   } else {
     xAxis.ticks(theme2.nBreaks);
   }
-  const yAxis = axisLeft(yScale).tickSize(theme2.tickLength).tickSizeOuter(0);
+  const yRight = ctx.yPosition === "right";
+  const yAxis = (yRight ? axisRight : axisLeft)(yScale).tickSize(theme2.tickLength).tickSizeOuter(0);
   if (yBreaks) {
     yAxis.tickValues(yBreaks.ticks).tickFormat((_d, i) => yBreaks.labels[i] ?? "");
   } else {
     yAxis.ticks(theme2.nBreaks);
   }
   const xAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-x").attr("transform", `translate(0,${innerHeight2})`).call(xAxis);
-  xAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
+  if (ctx.showXAxis === false) xAxisGroup.remove();
+  xAxisGroup.attr("font-family", theme2.fontFamily);
+  xAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", ctx.xLabelColor ?? theme2.axisTextColor);
   xAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   xAxisGroup.select(".domain").style("display", "none");
-  const yAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-y").call(yAxis);
-  yAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
+  const yAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-y").attr("font-family", theme2.fontFamily).call(yAxis);
+  if (yRight) yAxisGroup.attr("transform", `translate(${innerWidth},0)`);
+  if (ctx.showYAxis === false) yAxisGroup.remove();
+  yAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", ctx.yLabelColor ?? theme2.axisTextColor);
   yAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   yAxisGroup.select(".domain").style("display", "none");
   if (theme2.axisTextOverlap === "hide") {
@@ -8515,6 +8978,7 @@ function renderPanel(ctx) {
       layerGroup.append("text").attr("class", "ggpbi-layer-error").attr("x", innerWidth / 2).attr("y", innerHeight2 / 2).attr("text-anchor", "middle").attr("fill", theme2.axisTextColor).attr("font-size", `${theme2.axisTextSize}px`).attr("opacity", 0.6).text(`Layer "${geom.type}" failed`);
     }
   }
+  drawEndMarks(ctx, yTicks);
   if (theme2.isHighContrast) {
     panelG.selectAll(".ggpbi-bar").attr("stroke", theme2.ink).attr("stroke-width", theme2.highContrastStrokeWidth);
     panelG.selectAll(".ggpbi-point").attr("stroke", theme2.ink).attr("stroke-width", theme2.highContrastStrokeWidth);
@@ -8754,6 +9218,11 @@ function geomArgs(geom) {
   }
   return parts.join(", ");
 }
+var R_SCALE_ARG = {
+  dateBreaks: "date_breaks",
+  labelUnit: "label_unit",
+  labelColor: "label_colour"
+};
 function scaleLine(axis2, cfg) {
   if (!cfg) return void 0;
   const conf = typeof cfg === "string" ? { type: cfg } : cfg;
@@ -8786,7 +9255,8 @@ function scaleLine(axis2, cfg) {
       continue;
     }
     if (key === "min" || key === "max") continue;
-    args.push(`${key} = ${rValue(value)}`);
+    const rKey = R_SCALE_ARG[key] ?? key;
+    args.push(`${rKey} = ${rValue(value)}`);
   }
   const limits = limitsArg(conf);
   if (limits) args.push(limits);
@@ -8794,10 +9264,10 @@ function scaleLine(axis2, cfg) {
   return `scale_${axis2}_continuous(${args.join(", ")})`;
 }
 function limitsArg(conf) {
-  const { min: min2, max: max2 } = conf;
-  if (min2 === void 0 && max2 === void 0) return void 0;
+  const { min: min2, max: max3 } = conf;
+  if (min2 === void 0 && max3 === void 0) return void 0;
   const lo = min2 === void 0 ? "NA" : rValue(min2);
-  const hi = max2 === void 0 ? "NA" : rValue(max2);
+  const hi = max3 === void 0 ? "NA" : rValue(max3);
   return `limits = c(${lo}, ${hi})`;
 }
 function specToR(spec, labels = {}) {
@@ -8817,13 +9287,17 @@ function specToR(spec, labels = {}) {
     if (line) lines.push(`  ${line}`);
   }
   if (spec.facet) {
-    const { wrap, row, col, ncol, nrow, freeX, freeY } = spec.facet;
+    const { wrap, row, col, ncol, nrow, freeX, freeY, heights, strips, rowAxes } = spec.facet;
     const scalesArg = freeX && freeY ? ', scales = "free"' : freeX ? ', scales = "free_x"' : freeY ? ', scales = "free_y"' : "";
+    const extArgs = (strips === false ? ", strip = FALSE" : "") + (rowAxes && rowAxes.length > 0 ? `, row_axes = ${rValue(rowAxes)}` : "");
     if (wrap) {
       const extra = ncol ? `, ncol = ${ncol}` : nrow ? `, nrow = ${nrow}` : "";
-      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg})`);
+      lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg}${extArgs})`);
     } else if (row || col) {
-      lines.push(`  facet_grid(${row ? rName(row) : "."} ~ ${col ? rName(col) : "."}${scalesArg})`);
+      lines.push(`  facet_grid(${row ? rName(row) : "."} ~ ${col ? rName(col) : "."}${scalesArg}${extArgs})`);
+    }
+    if (heights && heights.length > 0 && (wrap || row || col)) {
+      lines.push(`  ggh4x::force_panelsizes(rows = c(${heights.join(", ")}))`);
     }
   }
   if (spec.highlight) {
@@ -22422,8 +22896,8 @@ var lineNumberGutter = /* @__PURE__ */ activeGutters.compute([lineNumberConfig],
     return new NumberMarker(formatNumber(view, maxLineNumber(view.state.doc.lines)));
   },
   updateSpacer(spacer, update) {
-    let max2 = formatNumber(update.view, maxLineNumber(update.view.state.doc.lines));
-    return max2 == spacer.number ? spacer : new NumberMarker(max2);
+    let max3 = formatNumber(update.view, maxLineNumber(update.view.state.doc.lines));
+    return max3 == spacer.number ? spacer : new NumberMarker(max3);
   },
   domEventHandlers: state.facet(lineNumberConfig).domEventHandlers,
   side: "before"
@@ -27580,17 +28054,17 @@ function optionContent(config) {
   });
   return content2.sort((a, b) => a.position - b.position).map((a) => a.render);
 }
-function rangeAroundSelected(total, selected, max2) {
-  if (total <= max2)
+function rangeAroundSelected(total, selected, max3) {
+  if (total <= max3)
     return { from: 0, to: total };
   if (selected < 0)
     selected = 0;
   if (selected <= total >> 1) {
-    let off3 = Math.floor(selected / max2);
-    return { from: off3 * max2, to: (off3 + 1) * max2 };
+    let off3 = Math.floor(selected / max3);
+    return { from: off3 * max3, to: (off3 + 1) * max3 };
   }
-  let off2 = Math.ceil((total - selected) / max2);
-  return { from: total - off2 * max2, to: total - (off2 - 1) * max2 };
+  let off2 = Math.ceil((total - selected) / max3);
+  return { from: total - off2 * max3, to: total - (off2 - 1) * max3 };
 }
 var CompletionTooltip = class {
   constructor(view, stateField, applyCompletion2) {
@@ -31877,8 +32351,8 @@ function initVim(CM) {
     var curHead = cm.getCursor("head");
     var primIndex = getIndex(ranges, curHead);
     var wasClipped = cursorEqual(ranges[primIndex].head, ranges[primIndex].anchor);
-    var max2 = ranges.length - 1;
-    var index2 = max2 - primIndex > primIndex ? max2 : 0;
+    var max3 = ranges.length - 1;
+    var index2 = max3 - primIndex > primIndex ? max3 : 0;
     var base2 = ranges[index2].anchor;
     var firstLine = Math.min(base2.line, head.line);
     var lastLine = Math.max(base2.line, head.line);
@@ -32448,7 +32922,7 @@ function initVim(CM) {
   function findParagraph(cm, head, repeat, dir, inclusive) {
     var line = head.line;
     var min2 = cm.firstLine();
-    var max2 = cm.lastLine();
+    var max3 = cm.lastLine();
     var start2, end, i = line;
     function isEmpty(i2) {
       return !cm.getLine(i2);
@@ -32460,7 +32934,7 @@ function initVim(CM) {
       return !isEmpty(i2) && isEmpty(i2 + dir2);
     }
     if (dir) {
-      while (min2 <= i && i <= max2 && repeat > 0) {
+      while (min2 <= i && i <= max3 && repeat > 0) {
         if (isBoundary(i, dir)) {
           repeat--;
         }
@@ -32478,7 +32952,7 @@ function initVim(CM) {
       }
     }
     var startState = isEmpty(line);
-    for (i = line; i <= max2 && repeat; i++) {
+    for (i = line; i <= max3 && repeat; i++) {
       if (isBoundary(i, 1, true)) {
         if (!inclusive || isEmpty(i) != startState) {
           repeat--;
@@ -32486,7 +32960,7 @@ function initVim(CM) {
       }
     }
     end = new Pos2(i, 0);
-    if (i > max2 && !startState) {
+    if (i > max3 && !startState) {
       startState = true;
     } else {
       inclusive = false;
@@ -36133,14 +36607,14 @@ var Marker = class {
 };
 function hardWrap(cm, options2) {
   var _a2;
-  var max2 = options2.column || cm.getOption("textwidth") || 80;
+  var max3 = options2.column || cm.getOption("textwidth") || 80;
   var allowMerge = options2.allowMerge != false;
   var row = Math.min(options2.from, options2.to);
   var endRow = Math.max(options2.from, options2.to);
   while (row <= endRow) {
     var line = cm.getLine(row);
-    if (line.length > max2) {
-      var space = findSpace(line, max2, 5);
+    if (line.length > max3) {
+      var space = findSpace(line, max3, 5);
       if (space) {
         var indentation = (_a2 = /^\s*/.exec(line)) === null || _a2 === void 0 ? void 0 : _a2[0];
         cm.replaceRange("\n" + indentation, new Pos(row, space.start), new Pos(row, space.end));
@@ -36152,8 +36626,8 @@ function hardWrap(cm, options2) {
         var trimmedLine = line.replace(/\s+$/, "");
         var trimmedNextLine = nextLine.replace(/^\s+/, "");
         var mergedLine = trimmedLine + " " + trimmedNextLine;
-        var space = findSpace(mergedLine, max2, 5);
-        if (space && space.start > trimmedLine.length || mergedLine.length < max2) {
+        var space = findSpace(mergedLine, max3, 5);
+        if (space && space.start > trimmedLine.length || mergedLine.length < max3) {
           cm.replaceRange(" ", new Pos(row, trimmedLine.length), new Pos(row + 1, nextLine.length - trimmedNextLine.length));
           row--;
           endRow--;
@@ -36165,23 +36639,23 @@ function hardWrap(cm, options2) {
     row++;
   }
   return row;
-  function findSpace(line2, max3, min2) {
-    if (line2.length < max3)
+  function findSpace(line2, max4, min2) {
+    if (line2.length < max4)
       return;
-    var before = line2.slice(0, max3);
-    var after = line2.slice(max3);
+    var before = line2.slice(0, max4);
+    var after = line2.slice(max4);
     var spaceAfter = /^(?:(\s+)|(\S+)(\s+))/.exec(after);
     var spaceBefore = /(?:(\s+)|(\s+)(\S+))$/.exec(before);
     var start2 = 0;
     var end = 0;
     if (spaceBefore && !spaceBefore[2]) {
-      start2 = max3 - spaceBefore[1].length;
-      end = max3;
+      start2 = max4 - spaceBefore[1].length;
+      end = max4;
     }
     if (spaceAfter && !spaceAfter[2]) {
       if (!start2)
-        start2 = max3;
-      end = max3 + spaceAfter[1].length;
+        start2 = max4;
+      end = max4 + spaceAfter[1].length;
     }
     if (start2) {
       return {
@@ -36196,7 +36670,7 @@ function hardWrap(cm, options2) {
       };
     }
     if (spaceAfter && spaceAfter[2]) {
-      start2 = max3 + spaceAfter[2].length;
+      start2 = max4 + spaceAfter[2].length;
       return {
         start: start2,
         end: start2 + spaceAfter[3].length
@@ -37463,9 +37937,9 @@ var GEOM_OPTIONS = [
   "varwidth",
   "naRm"
 ];
-var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels"];
-var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY"];
-var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize"];
+var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels", "dateBreaks", "labelUnit", "labelColor", "position"];
+var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY", "heights", "strips", "rowAxes"];
+var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize", "fontFamily", "gridX", "gridY", "gridMinor", "ticks"];
 var THEME_PRESETS = ["grey", "minimal", "dark"];
 var options = (labels, type2) => labels.map((label) => ({ label, type: type2 }));
 function createGgpbiCompletions(fields = []) {
@@ -37557,6 +38031,7 @@ var R_FUNCTIONS = [
   "scale_y_continuous",
   "facet_wrap",
   "facet_grid",
+  "ggh4x::force_panelsizes",
   "gghighlight",
   "labs",
   "theme_ggpbi",
@@ -37600,7 +38075,14 @@ var R_NAMED_ARGS = [
   "limits",
   "labels",
   "subtitle",
-  "trans"
+  "trans",
+  "rows",
+  "position",
+  "date_breaks",
+  "label_unit",
+  "label_colour",
+  "strip",
+  "row_axes"
 ];
 var rApply = (name2) => /^[a-zA-Z.][\w.]*$/.test(name2) ? name2 : `\`${name2.replace(/`/g, "")}\``;
 function createGgplot2Completions(fields = []) {
@@ -38057,112 +38539,6 @@ async function copyText(container, text) {
   }
 }
 
-// src/position.ts
-function applyDodge(points, padded = false) {
-  const colorGroups = Array.from(
-    new Set(points.map((d) => String(d.color ?? "__none__")))
-  );
-  const nColors = colorGroups.length;
-  return points.map((d) => ({
-    ...d,
-    _dodgeIndex: colorGroups.indexOf(String(d.color ?? "__none__")),
-    _dodgeN: nColors,
-    _dodgePadded: padded
-  }));
-}
-function applyStack(points, orientation = "x") {
-  const isHorizontal = orientation === "y";
-  const catKey = (d) => String(isHorizontal ? d.y : d.x);
-  const seriesKey = (d) => `${String(d.group ?? "")}|${String(d.color ?? "")}`;
-  const groups2 = /* @__PURE__ */ new Map();
-  for (const d of points) {
-    const key = catKey(d);
-    if (!groups2.has(key)) groups2.set(key, []);
-    groups2.get(key).push(d);
-  }
-  const seriesOrder = /* @__PURE__ */ new Map();
-  for (const d of points) {
-    const key = seriesKey(d);
-    if (!seriesOrder.has(key)) seriesOrder.set(key, seriesOrder.size);
-  }
-  if (seriesOrder.size > 1) {
-    for (const group2 of groups2.values()) {
-      group2.sort((a, b) => seriesOrder.get(seriesKey(a)) - seriesOrder.get(seriesKey(b)));
-    }
-  }
-  const result = new Array(points.length);
-  const pointIndex = /* @__PURE__ */ new Map();
-  for (let i = 0; i < points.length; i++) {
-    pointIndex.set(points[i], i);
-  }
-  for (const [, group2] of groups2) {
-    let cumPos = 0;
-    let cumNeg = 0;
-    for (const d of group2) {
-      const val = Number(isHorizontal ? d.x : d.y);
-      const idx = pointIndex.get(d);
-      if (!Number.isFinite(val)) {
-        result[idx] = { ...d, _v0: cumPos, _v1: cumPos };
-        continue;
-      }
-      if (val >= 0) {
-        result[idx] = { ...d, _v0: cumPos, _v1: cumPos + val };
-        cumPos += val;
-      } else {
-        result[idx] = { ...d, _v0: cumNeg + val, _v1: cumNeg };
-        cumNeg += val;
-      }
-    }
-  }
-  return result;
-}
-function applyFill(points, orientation = "x") {
-  const stacked = applyStack(points, orientation);
-  const isHorizontal = orientation === "y";
-  const catKey = (d) => String(isHorizontal ? d.y : d.x);
-  const posTotal = /* @__PURE__ */ new Map();
-  const negTotal = /* @__PURE__ */ new Map();
-  for (const d of stacked) {
-    const key = catKey(d);
-    const v1 = d._v1;
-    const v0 = d._v0;
-    if (v1 > 0) posTotal.set(key, Math.max(posTotal.get(key) ?? 0, v1));
-    if (v0 < 0) negTotal.set(key, Math.min(negTotal.get(key) ?? 0, v0));
-  }
-  return stacked.map((d) => {
-    const key = catKey(d);
-    const v0 = d._v0;
-    const v1 = d._v1;
-    if (v1 > 0 && v0 >= 0) {
-      const total = posTotal.get(key) ?? 1;
-      if (total === 0) return d;
-      return { ...d, _v0: v0 / total, _v1: v1 / total };
-    } else if (v0 < 0 && v1 <= 0) {
-      const total = Math.abs(negTotal.get(key) ?? -1);
-      if (total === 0) return d;
-      return { ...d, _v0: v0 / total, _v1: v1 / total };
-    }
-    return d;
-  });
-}
-function computePosition(points, geom) {
-  const position = geom.position ?? "stack";
-  const orientation = ("orientation" in geom ? geom.orientation : void 0) ?? "x";
-  switch (position) {
-    case "dodge":
-      return applyDodge(points);
-    case "dodge2":
-      return applyDodge(points, true);
-    case "stack":
-      return applyStack(points, orientation);
-    case "fill":
-      return applyFill(points, orientation);
-    case "identity":
-    case "jitter":
-      return points.map((d) => ({ ...d }));
-  }
-}
-
 // src/describe.ts
 var GEOM_NOUN = {
   point: "Values",
@@ -38389,11 +38765,11 @@ function applyLayerFilter(data, geom, aes, scales) {
   }
   return data.filter((d) => keep.has(d));
 }
-function hasMultipleRowsPerGroup(data, aes, horizontal) {
+function hasMultipleRowsPerGroup(data, aes, horizontal, facetFields2 = []) {
   if (!data || data.length === 0) return false;
   const catField = horizontal ? aes.y : aes.x;
   if (!catField) return false;
-  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol].filter((f) => !!f);
+  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol, ...facetFields2].filter((f) => !!f);
   const seen = /* @__PURE__ */ new Set();
   for (const d of data) {
     const key = keyFields.map((f) => String(d[f])).join("\0");
@@ -38402,16 +38778,29 @@ function hasMultipleRowsPerGroup(data, aes, horizontal) {
   }
   return false;
 }
-function resolveLayerStat(layer2, globalAes, data) {
+function facetFields(facet) {
+  if (!facet) return [];
+  if (facet.wrap) return [facet.wrap];
+  return [facet.row, facet.col].filter((f) => !!f);
+}
+function isMissingValue(v) {
+  return v == null || v === "" || typeof v === "number" && Number.isNaN(v);
+}
+function rowsWithValue(data, field) {
+  if (!data || !field) return data;
+  return data.filter((d) => !isMissingValue(d[field]));
+}
+function resolveLayerStat(layer2, globalAes, data, facet) {
   const explicit = layer2.stat ?? layer2.geom.stat;
   if (explicit) return explicit;
   const defaultStat = DEFAULT_GEOM_STAT[layer2.geom.type];
   if (!defaultStat) return "identity";
   if (defaultStat === "count") {
     const horizontal = "orientation" in layer2.geom && layer2.geom.orientation === "y";
-    const valueMapped = horizontal ? !!globalAes.x : !!globalAes.y;
-    if (valueMapped) {
-      return hasMultipleRowsPerGroup(data, globalAes, horizontal) ? "sum" : "identity";
+    const aes = mergeAes2(globalAes, layer2.aes ?? layer2.geom.aes);
+    const valueField = horizontal ? aes.x : aes.y;
+    if (valueField) {
+      return hasMultipleRowsPerGroup(rowsWithValue(data, valueField), aes, horizontal, facetFields(facet)) ? "sum" : "identity";
     }
   }
   if (defaultStat === "bin") return "bin";
@@ -38444,10 +38833,11 @@ function stripStatAes(layers, keys2) {
 }
 function computeStat(spec, data) {
   for (const layer2 of spec.layers) {
-    const statType = resolveLayerStat(layer2, spec.aes, data);
+    const statType = resolveLayerStat(layer2, spec.aes, data, spec.facet);
     if (statType === "identity" || statType === "boxplot" || statType === "smooth") continue;
     const statFn = stats[statType];
-    const result = statFn(data, spec.aes, layer2.geom);
+    const statAes = mergeAes2(spec.aes, layer2.aes ?? layer2.geom.aes);
+    const result = statType === "sum" || statType === "count" ? statPerPanel(data, spec.facet, (part) => statFn(part, statAes, layer2.geom)) : statFn(data, statAes, layer2.geom);
     if (data.length > 0 && result.data.length === 0) {
       throw new Error(`ggpbi: stat "${statType}" needs at least 2 values per group`);
     }
@@ -38459,6 +38849,26 @@ function computeStat(spec, data) {
     };
   }
   return { spec, data };
+}
+function statPerPanel(data, facet, run) {
+  const fields = facetFields(facet);
+  if (fields.length === 0) return run(data);
+  const parts = /* @__PURE__ */ new Map();
+  for (const d of data) {
+    const key = fields.map((f) => String(d[f])).join("\0");
+    const part = parts.get(key);
+    if (part) part.push(d);
+    else parts.set(key, [d]);
+  }
+  let aesOverrides;
+  const out = [];
+  for (const part of parts.values()) {
+    const result = run(part);
+    aesOverrides ??= result.aesOverrides;
+    const panel = Object.fromEntries(fields.map((f) => [f, part[0][f]]));
+    for (const row of result.data) out.push({ ...row, ...panel });
+  }
+  return { data: out, ...aesOverrides && { aesOverrides } };
 }
 function computeSizeScale(layerBindings, data, sizeField) {
   if (!sizeField) return layerBindings;
@@ -38622,6 +39032,47 @@ function createColorScale(data, aes, theme2) {
   const unique = Array.from(new Set(data.map((d) => d[aes.color])));
   return ordinal().domain(unique.map(String)).range(theme2.colorPalette);
 }
+function boundExtent(bindings, geoms, axis2, includeZeroBaseline = true) {
+  let lo = Infinity;
+  let hi = -Infinity;
+  const add = (v) => {
+    if (isMissingValue(v)) return;
+    const n = v instanceof Date ? v.getTime() : Number(v);
+    if (!Number.isFinite(n)) return;
+    if (n < lo) lo = n;
+    if (n > hi) hi = n;
+  };
+  const rangeKeys = axis2 === "y" ? ["y", "ymin", "ymax", "yend"] : ["x", "xmin", "xmax", "xend"];
+  bindings.forEach((points, li) => {
+    const geom = geoms[li];
+    const barLike = !!geom && (geom.type === "bar" || geom.type === "col" || geom.type === "histogram");
+    const horizontal = !!geom && "orientation" in geom && geom.orientation === "y";
+    const valueAxis = horizontal ? "x" : "y";
+    const onZero = !!geom && standsOnZero(geom, axis2);
+    let any = false;
+    for (const p of points) {
+      if (barLike && axis2 === valueAxis && (p._v0 !== void 0 || p._v1 !== void 0)) {
+        if (isMissingValue(p[axis2])) continue;
+        if (Number.isFinite(p._v0) && Number.isFinite(p._v1)) {
+          add(p._v0);
+          add(p._v1);
+          any = true;
+        }
+        continue;
+      }
+      for (const k of rangeKeys) add(p[k]);
+      if (!isMissingValue(p[axis2]) && Number.isFinite(Number(p[axis2]))) any = true;
+    }
+    if (onZero && includeZeroBaseline && any) add(0);
+  });
+  return Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : void 0;
+}
+function standsOnZero(geom, axis2) {
+  const barLike = geom.type === "bar" || geom.type === "col" || geom.type === "histogram";
+  const horizontal = "orientation" in geom && geom.orientation === "y";
+  if (barLike) return axis2 === (horizontal ? "x" : "y");
+  return geom.type === "area" && axis2 === "y";
+}
 function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2) {
   const xCfg = parseScaleConfig(spec.scales?.x);
   const yCfg = parseScaleConfig(spec.scales?.y);
@@ -38659,6 +39110,7 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
     let xMax = -Infinity;
     for (const field of [spec.aes.x, ...xRangeFields]) {
       for (const d of data) {
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < xMin) xMin = v;
@@ -38686,6 +39138,7 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
     let yMax = -Infinity;
     for (const field of allYFields) {
       for (const d of data) {
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < yMin) yMin = v;
@@ -38693,7 +39146,8 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
         }
       }
     }
-    yScale = createScale(data, spec.aes.y, yType, [innerHeight2, 0]);
+    const scaleField = [spec.aes.y, ...allYFields].find((f) => data.some((d) => !isMissingValue(d[f]))) ?? spec.aes.y;
+    yScale = createScale(data, scaleField, yType, [innerHeight2, 0]);
     if (isFinite(yMin) && isFinite(yMax)) {
       yScale.domain([yMin, yMax]);
     }
@@ -38772,19 +39226,27 @@ function estimateYTickLabelWidth(spec, data, theme2) {
   } else if (yType === "time") {
     labels = ["MMMMMM"];
   } else {
+    const yFields = /* @__PURE__ */ new Set([yField]);
+    for (const layer2 of spec.layers) {
+      const layerY = (layer2.aes ?? layer2.geom.aes)?.y;
+      if (layerY) yFields.add(layerY);
+    }
     let lo = Infinity;
     let hi = -Infinity;
-    for (const d of data) {
-      const v = Number(d[yField]);
-      if (Number.isFinite(v)) {
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
+    for (const field of yFields) {
+      for (const d of data) {
+        if (isMissingValue(d[field])) continue;
+        const v = Number(d[field]);
+        if (Number.isFinite(v)) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
       }
     }
     if (!isFinite(lo) || !isFinite(hi)) return 0;
     if (yCfg.min !== void 0) lo = yCfg.min;
     if (yCfg.max !== void 0) hi = yCfg.max;
-    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels);
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
   }
   let maxWidth = 0;
   for (const label of labels) {
@@ -38796,14 +39258,25 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
   const width = spec.width ?? 600;
   const height = spec.height ?? 400;
   let baseMargin = margin ?? theme2.margin;
+  let yAxisRoom = 0;
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
   if (!margin) {
+    const yTitle = !isBlankLabel(spec.yLabel);
     const labelWidth = estimateYTickLabelWidth(spec, spec.data ?? [], theme2);
+    const titleRoom = yTitle ? theme2.axisTitleSize + theme2.axisTitleMargin : 0;
     const required = Math.ceil(
-      theme2.halfLine * 2 + theme2.axisTitleSize + theme2.axisTitleMargin + labelWidth + theme2.tickLength + AXIS_TICK_PADDING
+      theme2.halfLine * 2 + titleRoom + labelWidth + theme2.tickLength + AXIS_TICK_PADDING
     );
     const cap = Math.floor(width * 0.4);
-    const left2 = Math.max(theme2.margin.left, Math.min(required, cap));
-    baseMargin = { ...theme2.margin, left: left2 };
+    const floor = yTitle ? theme2.margin.left : Math.round(theme2.halfLine * 2);
+    const side = Math.max(floor, Math.min(required, cap));
+    yAxisRoom = Math.max(0, side - theme2.halfLine * 2 - titleRoom);
+    const xTitle = !isBlankLabel(spec.xLabel);
+    const xAxis = drawsBottomXAxis(spec);
+    const bottom2 = xTitle && xAxis ? theme2.margin.bottom : Math.round(
+      theme2.halfLine * 2 + (xAxis ? theme2.axisTextSize + theme2.halfLine / 2 : 0) + (xTitle ? theme2.axisTitleSize + theme2.halfLine / 2 : 0)
+    );
+    baseMargin = yRight ? { ...theme2.margin, left: Math.round(theme2.halfLine * 2), right: side, bottom: bottom2 } : { ...theme2.margin, left: side, bottom: bottom2 };
   }
   const effectiveMargin = {
     ...baseMargin,
@@ -38816,8 +39289,18 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
     height,
     innerWidth: width - effectiveMargin.left - effectiveMargin.right,
     innerHeight: height - effectiveMargin.top - effectiveMargin.bottom,
-    margin: effectiveMargin
+    margin: effectiveMargin,
+    yAxisRoom
   };
+}
+function isBlankLabel(label) {
+  return label !== void 0 && label.trim() === "";
+}
+function drawsBottomXAxis(spec) {
+  const facet = spec.facet;
+  if (!facet?.rowAxes || !(facet.wrap || facet.row || facet.col)) return true;
+  const { nRows } = facetDims(facet, spec.data ?? []);
+  return parseRowAxes(facet.rowAxes[nRows - 1])?.x ?? true;
 }
 function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   const notes = [];
@@ -38827,7 +39310,7 @@ function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   if (spec.warnAggregated) {
     const descriptions2 = preStatSpec.layers.map((layer2) => ({
       geom: layer2.geom.type,
-      stat: resolveLayerStat(layer2, preStatSpec.aes, rawData)
+      stat: resolveLayerStat(layer2, preStatSpec.aes, rawData, preStatSpec.facet)
     }));
     if (shouldWarnAggregated(descriptions2, preStatSpec.aes, rawData)) {
       notes.push(AGGREGATION_NOTE);
@@ -38841,7 +39324,7 @@ function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   const autoGeom = inputSpec.layers.length === 0;
   const descriptions = preStatSpec.layers.map((layer2) => ({
     geom: layer2.geom.type,
-    stat: resolveLayerStat(layer2, preStatSpec.aes, rawData),
+    stat: resolveLayerStat(layer2, preStatSpec.aes, rawData, preStatSpec.facet),
     autoGeom
   }));
   if (mode === "auto" && !hasHiddenTransform(descriptions)) return withNote(void 0);
@@ -39073,9 +39556,20 @@ function createSvg(container, built) {
   }
   const { width, height, margin } = built.layout;
   const chartLabel = [built.spec.xLabel, built.spec.yLabel].filter(Boolean).join(" vs ") || "Chart";
-  const svg = select_default2(container).append("svg").attr("width", width).attr("height", height).attr("class", "ggpbi-visual").attr("role", "img").attr("aria-label", chartLabel).style("pointer-events", "none");
+  const svg = select_default2(container).append("svg").attr("width", width).attr("height", height).attr("class", "ggpbi-visual").attr("role", "img").attr("aria-label", chartLabel).style("pointer-events", "none").style("font-family", built.theme.fontFamily);
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
   return { svg, g };
+}
+function axisOptions(xCfg, yCfg) {
+  return {
+    yPosition: yCfg.position,
+    xLabelUnit: xCfg.labelUnit,
+    yLabelUnit: yCfg.labelUnit,
+    xLabelColor: xCfg.labelColor,
+    yLabelColor: yCfg.labelColor,
+    xDateBreaks: xCfg.dateBreaks,
+    yDateBreaks: yCfg.dateBreaks
+  };
 }
 function renderFaceted(g, svg, built) {
   const { spec, data, theme: theme2, scales } = built;
@@ -39083,98 +39577,172 @@ function renderFaceted(g, svg, built) {
   const facet = spec.facet;
   const rowField = facet.row;
   const colField = facet.col;
-  const levelSort = (a, b) => {
-    const na = Number(a);
-    const nb = Number(b);
-    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-    return a.localeCompare(b);
-  };
   const wrapField = facet.wrap;
-  const wrapLevels = wrapField ? Array.from(new Set(data.map((d) => String(d[wrapField])))).sort(levelSort) : [];
-  const rowLevels = !wrapField && rowField ? Array.from(new Set(data.map((d) => String(d[rowField])))).sort(levelSort) : [""];
-  const colLevels = !wrapField && colField ? Array.from(new Set(data.map((d) => String(d[colField])))).sort(levelSort) : [""];
-  let nRows;
-  let nCols;
-  if (wrapField) {
-    const n = wrapLevels.length;
-    nCols = facet.ncol ?? (facet.nrow ? Math.ceil(n / facet.nrow) : Math.ceil(Math.sqrt(n)));
-    nCols = Math.max(1, Math.min(nCols, n));
-    nRows = Math.ceil(n / nCols);
-  } else {
-    nRows = Math.max(1, rowLevels.length);
-    nCols = Math.max(1, colLevels.length);
-  }
-  const panelOuterWidth = innerWidth / nCols;
-  const panelOuterHeight = innerHeight2 / nRows;
-  const panelMargin = { top: 22, right: 12, bottom: 34, left: 44 };
+  const { wrapLevels, rowLevels, colLevels, nRows, nCols } = facetDims(facet, data);
+  const showStrips = facet.strips !== false;
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
   const xCfg = parseScaleConfig(spec.scales?.x);
   const yCfg = parseScaleConfig(spec.scales?.y);
   const { xType, yType } = scales;
+  const geoms = spec.layers.map((l) => l.geom);
   const xBandOpts = xType === "ordinal" || xType === "category" ? { paddingInner: xCfg.paddingInner, paddingOuter: xCfg.paddingOuter } : void 0;
+  const cells = [];
   for (let r = 0; r < nRows; r++) {
     for (let c = 0; c < nCols; c++) {
       const wrapVal = wrapField ? wrapLevels[r * nCols + c] : void 0;
       if (wrapField && wrapVal === void 0) continue;
       const rowVal = rowLevels[r];
       const colVal = colLevels[c];
-      const dataCell = data.filter((d) => {
+      const rows = data.filter((d) => {
         if (wrapField) return String(d[wrapField]) === wrapVal;
         const okRow = !rowField || String(d[rowField]) === rowVal;
         const okCol = !colField || String(d[colField]) === colVal;
         return okRow && okCol;
       });
-      const facetG = g.append("g").attr("class", "ggpbi-facet").attr("transform", `translate(${c * panelOuterWidth},${r * panelOuterHeight})`);
-      if (wrapField) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-wrap").attr("x", panelOuterWidth / 2).attr("y", 14).attr("text-anchor", "middle").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(wrapVal);
-      }
-      if (!wrapField && colField && r === 0) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-col").attr("x", panelOuterWidth / 2).attr("y", 14).attr("text-anchor", "middle").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(colVal);
-      }
-      if (!wrapField && rowField && c === 0) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-row").attr("x", 4).attr("y", 14).attr("text-anchor", "start").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(rowVal);
-      }
-      const panelInnerWidth = panelOuterWidth - panelMargin.left - panelMargin.right;
-      const panelInnerHeight = panelOuterHeight - panelMargin.top - panelMargin.bottom;
-      const panelG = facetG.append("g").attr("transform", `translate(${panelMargin.left},${panelMargin.top})`);
-      const xScale = facet.freeX ? createScale(dataCell, spec.aes.x, xType, [0, panelInnerWidth], xBandOpts) : createScale(data, spec.aes.x, xType, [0, panelInnerWidth], xBandOpts);
-      applyExpandAndLimits(xScale, xType, xCfg, built.geomPadPx.x);
-      const yScale = facet.freeY ? createScale(dataCell, spec.aes.y, yType, [panelInnerHeight, 0]) : createScale(data, spec.aes.y, yType, [panelInnerHeight, 0]);
-      applyExpandAndLimits(yScale, yType, yCfg, built.geomPadPx.y);
-      let cellLayerData = spec.layers.map((layer2) => {
-        if (dataCell.length === 0) return [];
-        const layerAes = layer2.aes ?? layer2.geom.aes;
-        const mergedAes = mergeAes2(spec.aes, layerAes);
-        const cellRows = applyLayerFilter(dataCell, layer2.geom, mergedAes, spec.scales);
-        const layerBoundCell = bindData(cellRows, mergedAes);
+      let layerData = spec.layers.map((layer2) => {
+        if (rows.length === 0) return [];
+        const mergedAes = mergeAes2(spec.aes, layer2.aes ?? layer2.geom.aes);
+        const cellRows = applyLayerFilter(rows, layer2.geom, mergedAes, spec.scales);
+        const bound = bindData(cellRows, mergedAes);
         if (spec.aes.size) {
           const facetSizeScale = createSizeScale(data, spec.aes.size);
-          for (const bp of layerBoundCell) {
+          for (const bp of bound) {
             if (bp.size != null) bp.size = facetSizeScale(Number(bp.size));
           }
         }
-        return layerBoundCell;
+        const t2 = layer2.geom.type;
+        return t2 === "bar" || t2 === "col" || t2 === "histogram" ? computePosition(bound, layer2.geom) : bound;
       });
-      cellLayerData = applyHighlightToBindings(cellLayerData, spec);
-      renderPanel({
-        panelG,
-        svg,
-        innerWidth: panelInnerWidth,
-        innerHeight: panelInnerHeight,
-        xScale,
-        yScale,
-        theme: theme2,
-        colorScale: scales.color,
-        colorScaleBase: scales.colorBase,
-        geoms: spec.layers.map((l) => l.geom),
-        layerData: cellLayerData,
-        clipSuffix: `facet-${r}-${c}`,
-        xLabelFormat: xCfg.labels,
-        yLabelFormat: yCfg.labels,
-        format: spec.format,
-        xDateFormat: xCfg.dateLabels,
-        yDateFormat: yCfg.dateLabels
-      });
+      layerData = applyHighlightToBindings(layerData, spec);
+      cells.push({ r, c, label: { wrap: wrapVal, row: rowVal, col: colVal }, rows, layerData });
     }
+  }
+  const isContinuous = (t2) => t2 === "linear" || t2 === "log" || t2 === "sqrt";
+  const freshContinuous = (t2) => t2 === "log" ? log() : t2 === "sqrt" ? sqrt() : linear2();
+  const trainValueScale = (axis2, type2, scope, range2, cfg, padPx) => {
+    const bindings = scope.flatMap((cell) => cell.layerData);
+    const layerGeoms = scope.flatMap(() => geoms);
+    const ext = boundExtent(bindings, layerGeoms, axis2, false) ?? boundExtent(cells.flatMap((cell) => cell.layerData), cells.flatMap(() => geoms), axis2, false) ?? [0, 1];
+    const domain = ext[0] === ext[1] ? [ext[0] - (Math.abs(ext[0]) || 1) * 0.5, ext[1] + (Math.abs(ext[1]) || 1) * 0.5] : ext;
+    const scale = freshContinuous(type2).domain(domain).range(range2);
+    applyExpandAndLimits(scale, type2, cfg, padPx);
+    const onZero = bindings.some((pts, i) => standsOnZero(layerGeoms[i], axis2) && pts.some((p) => !isMissingValue(p[axis2]) && Number.isFinite(Number(p[axis2]))));
+    if (onZero && type2 !== "log") {
+      const [d0, d1] = scale.domain();
+      scale.domain([
+        cfg.min !== void 0 ? d0 : ext[0] >= 0 ? 0 : Math.min(d0, 0),
+        cfg.max !== void 0 ? d1 : ext[1] <= 0 ? 0 : Math.max(d1, 0)
+      ]);
+    }
+    return scale;
+  };
+  const hasHorizontalBars = geoms.some((gm) => standsOnZero(gm, "x"));
+  const makeXScale = (cell, range2) => {
+    if (hasHorizontalBars && isContinuous(xType)) {
+      return trainValueScale("x", xType, facet.freeX ? [cell] : cells, range2, xCfg, built.geomPadPx.x);
+    }
+    const scale = createScale(facet.freeX ? cell.rows : data, spec.aes.x, xType, range2, xBandOpts);
+    applyExpandAndLimits(scale, xType, xCfg, built.geomPadPx.x);
+    return scale;
+  };
+  const makeYScale = (cell, range2) => {
+    if (isContinuous(yType)) {
+      return trainValueScale("y", yType, facet.freeY ? [cell] : cells, range2, yCfg, built.geomPadPx.y);
+    }
+    const scale = createScale(facet.freeY ? cell.rows : data, spec.aes.y, yType, range2);
+    applyExpandAndLimits(scale, yType, yCfg, built.geomPadPx.y);
+    return scale;
+  };
+  const yLabelWidth = (cell) => {
+    const scale = makeYScale(cell, [100, 0]);
+    let labels;
+    if (typeof scale.bandwidth === "function") {
+      labels = scale.domain().map(String);
+    } else if (yType === "time") {
+      labels = ["MMMMMM"];
+    } else {
+      const [lo, hi] = scale.domain().map(Number);
+      const ticks2 = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? extendedBreaks(lo, hi, theme2.nBreaks).filter((t2) => t2 >= lo && t2 <= hi) : [];
+      labels = formatBreaksAs(ticks2, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
+    }
+    return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme2.axisTextSize)), 0);
+  };
+  const outerCol = yRight ? nCols - 1 : 0;
+  const rowAxes = (facet.rowAxes ?? []).map(parseRowAxes);
+  const colLabelWidth = Array.from({ length: nCols }, () => 0);
+  for (const cell of cells) {
+    if (cell.c === outerCol || facet.freeY || rowAxes[cell.r]?.y) {
+      colLabelWidth[cell.c] = Math.max(colLabelWidth[cell.c], yLabelWidth(cell));
+    }
+  }
+  const tickRoom = theme2.tickLength + AXIS_TICK_PADDING;
+  const reservedLeft = built.layout.yAxisRoom ?? 0;
+  const present = new Set(cells.map((cell) => `${cell.r},${cell.c}`));
+  const stripH = Math.round(theme2.axisTextSize + 1.6 * theme2.halfLine);
+  const grid = layoutFacetGrid({
+    nRows,
+    nCols,
+    present: (r, c) => present.has(`${r},${c}`),
+    innerWidth,
+    innerHeight: innerHeight2,
+    freeX: !!facet.freeX,
+    freeY: !!facet.freeY,
+    stripAbove: (r) => showStrips && (!!wrapField || !!colField && r === 0),
+    stripRight: showStrips && !wrapField && !!rowField,
+    yAxisSide: yRight ? "right" : "left",
+    rowAxes,
+    heights: facet.heights,
+    yAxisWidth: (c) => colLabelWidth[c] + tickRoom,
+    reservedLeft,
+    metrics: {
+      strip: stripH,
+      xAxis: Math.round(tickRoom + theme2.axisTextSize * 1.2),
+      spacing: theme2.halfLine,
+      // Free x scales label both edges of every panel: leave room so the
+      // last tick of one panel and the first of the next do not collide.
+      ...facet.freeX && { colSpacing: theme2.halfLine + theme2.axisTextSize * 2 }
+    }
+  });
+  const cellAt = new Map(cells.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  const stripText = (parent, cls, x2, y2, text, rotate = false) => {
+    const t2 = parent.append("text").attr("class", cls).attr("x", x2).attr("y", y2).attr("text-anchor", "middle").attr("dominant-baseline", "central").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(text);
+    if (rotate) t2.attr("transform", `rotate(90,${x2},${y2})`);
+  };
+  for (const pos of grid) {
+    const cell = cellAt.get(`${pos.r},${pos.c}`);
+    const facetG = g.append("g").attr("class", "ggpbi-facet").attr("transform", `translate(${pos.x},${pos.y})`);
+    if (showStrips && wrapField) {
+      stripText(facetG, "ggpbi-facet-strip-wrap", pos.width / 2, -stripH / 2, cell.label.wrap);
+    }
+    if (showStrips && !wrapField && colField && pos.r === 0) {
+      stripText(facetG, "ggpbi-facet-strip-col", pos.width / 2, -stripH / 2, cell.label.col);
+    }
+    if (showStrips && !wrapField && rowField && pos.c === nCols - 1) {
+      stripText(facetG, "ggpbi-facet-strip-row", pos.width + stripH / 2, pos.height / 2, cell.label.row, true);
+    }
+    const panelG = facetG.append("g").attr("class", "ggpbi-facet-panel");
+    renderPanel({
+      panelG,
+      svg,
+      innerWidth: pos.width,
+      innerHeight: pos.height,
+      xScale: makeXScale(cell, [0, pos.width]),
+      yScale: makeYScale(cell, [pos.height, 0]),
+      theme: theme2,
+      colorScale: scales.color,
+      colorScaleBase: scales.colorBase,
+      geoms,
+      layerData: cell.layerData,
+      clipSuffix: `facet-${pos.r}-${pos.c}`,
+      xLabelFormat: xCfg.labels,
+      yLabelFormat: yCfg.labels,
+      format: spec.format,
+      xDateFormat: xCfg.dateLabels,
+      yDateFormat: yCfg.dateLabels,
+      ...axisOptions(xCfg, yCfg),
+      showXAxis: pos.showXAxis,
+      showYAxis: pos.showYAxis
+    });
   }
 }
 function renderLabelsAndLegend(g, built) {
@@ -39184,15 +39752,23 @@ function renderLabelsAndLegend(g, built) {
   if (subtitle) {
     g.append("text").attr("class", "ggpbi-subtitle").attr("x", 0).attr("y", -theme2.halfLine).attr("text-anchor", "start").attr("font-size", `${theme2.plotCaptionSize}px`).attr("fill", theme2.axisTextColor).text(subtitle);
   }
-  if (spec.xLabel) {
-    g.append("text").attr("class", "ggpbi-axis-label-x").attr("x", innerWidth / 2).attr("y", innerHeight2 + theme2.margin.bottom - theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.xLabel);
+  if (spec.xLabel && !isBlankLabel(spec.xLabel)) {
+    g.append("text").attr("class", "ggpbi-axis-label-x").attr("x", innerWidth / 2).attr("y", innerHeight2 + layout.margin.bottom - theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.xLabel);
   }
-  if (spec.yLabel) {
-    g.append("text").attr("class", "ggpbi-axis-label-y").attr("transform", "rotate(-90)").attr("x", -innerHeight2 / 2).attr("y", -layout.margin.left + theme2.axisTitleSize + theme2.axisTitleMargin).attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.yLabel);
+  const yRight = parseScaleConfig(spec.scales?.y).position === "right";
+  const rightAxisRoom = yRight ? layout.margin.right - legend.width - theme2.halfLine * 2 : 0;
+  if (spec.yLabel && !isBlankLabel(spec.yLabel)) {
+    const title = g.append("text").attr("class", "ggpbi-axis-label-y").attr("text-anchor", "middle").attr("font-size", `${theme2.axisTitleSize}px`).attr("fill", theme2.ink).text(spec.yLabel);
+    if (yRight) {
+      const x2 = innerWidth + rightAxisRoom - theme2.axisTitleSize * 0.2;
+      title.attr("transform", `translate(${x2},${innerHeight2 / 2}) rotate(90)`).attr("x", 0).attr("y", 0);
+    } else {
+      title.attr("transform", "rotate(-90)").attr("x", -innerHeight2 / 2).attr("y", -layout.margin.left + theme2.axisTitleSize + theme2.axisTitleMargin);
+    }
   }
   const showLegend = spec.showLegend !== false;
   if (showLegend && legend.entries.length > 0 && spec.aes.color) {
-    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map((l) => l.geom), theme2, innerWidth);
+    renderLegend(g, legend.entries, spec.aes.color, spec.layers.map((l) => l.geom), theme2, innerWidth + rightAxisRoom);
   }
 }
 function renderWithState(container, spec, margin) {
@@ -39221,7 +39797,8 @@ function renderWithState(container, spec, margin) {
       yLabelFormat: parseScaleConfig(built.spec.scales?.y).labels,
       format: built.spec.format,
       xDateFormat: parseScaleConfig(built.spec.scales?.x).dateLabels,
-      yDateFormat: parseScaleConfig(built.spec.scales?.y).dateLabels
+      yDateFormat: parseScaleConfig(built.spec.scales?.y).dateLabels,
+      ...axisOptions(parseScaleConfig(built.spec.scales?.x), parseScaleConfig(built.spec.scales?.y))
     });
   }
   renderLabelsAndLegend(g, built);
@@ -39394,10 +39971,17 @@ var DEFAULT_ROLE_MAPPING = {
   tooltip: "tooltip"
 };
 function resolveColor(val, palette = []) {
-  if (!val) return void 0;
-  if (typeof val === "string") return val;
-  if (val?.solid?.color) return val.solid.color;
-  const tdc = val?.expr?.ThemeDataColor ?? val?.ThemeDataColor;
+  if (val == null) return void 0;
+  if (typeof val === "string") {
+    const s = val.trim().replace(/^'(.*)'$/s, "$1").trim();
+    return s === "" ? void 0 : s;
+  }
+  if (typeof val !== "object") return void 0;
+  if ("solid" in val) return resolveColor(val.solid?.color, palette);
+  if ("value" in val) return resolveColor(val.value, palette);
+  const literal3 = val.expr?.Literal?.Value;
+  if (typeof literal3 === "string") return resolveColor(literal3, palette);
+  const tdc = val.expr?.ThemeDataColor ?? val.ThemeDataColor;
   if (tdc && palette.length > 0) {
     const base2 = palette[tdc.ColorId % palette.length];
     return tdc.Percent ? adjustBrightness(base2, tdc.Percent) : base2;
@@ -39561,7 +40145,7 @@ function tokenize2(code) {
       continue;
     }
     if (/[a-zA-Z.]/.test(ch)) {
-      const m = /[a-zA-Z.][\w.]*/y;
+      const m = /[a-zA-Z.][\w.]*(?:::[a-zA-Z.][\w.]*)?/y;
       m.lastIndex = i;
       const hit = m.exec(code);
       toks.push({ kind: "ident", text: hit[0], line });
@@ -39796,9 +40380,33 @@ function mapScale(call, patch) {
       cfg.dateLabels = arg.value;
       continue;
     }
+    if (arg.name === "date_breaks") {
+      cfg.dateBreaks = arg.value;
+      continue;
+    }
+    if (arg.name === "label_unit") {
+      cfg.labelUnit = arg.value;
+      continue;
+    }
+    if (arg.name === "label_colour" || arg.name === "label_color") {
+      cfg.labelColor = arg.value;
+      continue;
+    }
     cfg[arg.name] = arg.value;
   }
   patch.scales = { ...patch.scales ?? {}, [axis2]: cfg };
+}
+function mapPanelSizes(call, patch) {
+  for (const arg of call.args) {
+    if (arg.name !== "rows") {
+      throw new ParseError2(`force_panelsizes(${arg.name ?? "\u2026"} = \u2026) is not supported \u2014 only rows = c(\u2026)`, arg.line);
+    }
+    const v = Array.isArray(arg.value) ? arg.value : [arg.value];
+    if (v.length === 0 || !v.every((h) => typeof h === "number" && h > 0)) {
+      throw new ParseError2("rows needs positive numbers, e.g. c(4, 1)", arg.line);
+    }
+    patch.facet = { ...patch.facet ?? {}, heights: v };
+  }
 }
 function mapFacet(call, patch) {
   const facet = {};
@@ -39822,6 +40430,19 @@ function mapFacet(call, patch) {
       facet[arg.name] = v;
       continue;
     }
+    if (arg.name === "strip") {
+      if (typeof v !== "boolean") throw new ParseError2("strip takes TRUE or FALSE", arg.line);
+      if (v === false) facet.strips = false;
+      continue;
+    }
+    if (arg.name === "row_axes") {
+      const entries = (Array.isArray(v) ? v : [v]).map(String);
+      if (!entries.every((e) => parseRowAxes(e) !== void 0)) {
+        throw new ParseError2('row_axes takes "x", "y", "xy" or "none" per row, e.g. c("xy", "none")', arg.line);
+      }
+      facet.rowAxes = entries;
+      continue;
+    }
     if (arg.name === "scales") {
       if (v === "free") {
         facet.freeX = true;
@@ -39833,7 +40454,8 @@ function mapFacet(call, patch) {
     }
     throw new ParseError2(`${call.fn}(${arg.name} = \u2026) is not supported`, arg.line);
   }
-  patch.facet = facet;
+  const heights = patch.facet?.heights;
+  patch.facet = heights ? { ...facet, heights } : facet;
 }
 function parseR(code) {
   try {
@@ -39863,6 +40485,10 @@ function parseR(code) {
       }
       if (call.fn === "facet_wrap" || call.fn === "facet_grid") {
         mapFacet(call, patch);
+        continue;
+      }
+      if (call.fn === "ggh4x::force_panelsizes" || call.fn === "force_panelsizes") {
+        mapPanelSizes(call, patch);
         continue;
       }
       if (call.fn === "gghighlight") {
@@ -39977,15 +40603,24 @@ var LAYER_OPTION_MAP = {
   just: { prop: "just", map: (v) => typeof v === "number" ? v : void 0 },
   orientation: { prop: "orientation", map: (v) => v === "x" || v === "y" ? v : void 0 },
   repel: { prop: "repel", map: (v) => typeof v === "boolean" ? v : void 0 },
-  labelTemplate: { prop: "labelTemplate", map: (v) => typeof v === "string" ? v : void 0 }
+  labelTemplate: { prop: "labelTemplate", map: (v) => typeof v === "string" ? v : void 0 },
+  endPoint: { prop: "endPoint", map: (v) => typeof v === "boolean" ? v : void 0 },
+  endLabel: { prop: "endLabel", map: (v) => typeof v === "boolean" ? v : void 0 },
+  lastFill: { prop: "lastFill", map: (v) => typeof v === "string" ? fill(v) : void 0 }
 };
 var THEME_OPTION_MAP = {
   panelFill: { prop: "panelFill", map: (v) => typeof v === "string" ? fill(v) : void 0 },
   gridColor: { prop: "gridlineColor", map: (v) => typeof v === "string" ? fill(v) : void 0 },
   ink: { prop: "ink", map: (v) => typeof v === "string" ? fill(v) : void 0 },
   paper: { prop: "paper", map: (v) => typeof v === "string" ? fill(v) : void 0 },
-  baseSize: { prop: "baseSize", map: (v) => typeof v === "number" ? v : void 0 }
+  baseSize: { prop: "baseSize", map: (v) => typeof v === "number" ? v : void 0 },
+  gridX: { prop: "gridX", map: (v) => typeof v === "boolean" ? v : void 0 },
+  gridY: { prop: "gridY", map: (v) => typeof v === "boolean" ? v : void 0 },
+  gridMinor: { prop: "gridMinor", map: (v) => typeof v === "boolean" ? v : void 0 },
+  ticks: { prop: "ticks", map: (v) => typeof v === "boolean" ? v : void 0 },
+  fontFamily: { prop: "fontFamily", map: (v) => typeof v === "string" ? v : void 0 }
 };
+var LABEL_UNITS = /* @__PURE__ */ new Set(["none", "thousands", "millions", "billions"]);
 var THEME_HOST_KEYS = /* @__PURE__ */ new Set(["colorPalette", "isHighContrast"]);
 function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
   const instances = [];
@@ -40048,7 +40683,15 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
   for (let i = cardLayers.length; i < liveCardLayers; i++) {
     add(`layer${i + 1}`, { enabled: false });
   }
-  const SCALE_PROP = { type: "type", labels: "labelFormat", dateLabels: "dateFormat" };
+  const SCALE_PROP = {
+    type: "type",
+    labels: "labelFormat",
+    dateLabels: "dateFormat",
+    labelUnit: "labelUnit",
+    labelColor: "labelColor",
+    dateBreaks: "dateBreaks",
+    position: "position"
+  };
   const scalePatch = (axis2, objectName) => {
     const cfg = patch.scales?.[axis2];
     const properties = {};
@@ -40057,13 +40700,18 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
       if (key === "type" && SCALE_TYPES.has(value)) properties.type = value;
       else if (key === "labels" && LABEL_FORMATS.has(value)) properties.labelFormat = value;
       else if (key === "dateLabels" && DATE_FORMATS.has(value)) properties.dateFormat = value;
+      else if (key === "labelUnit" && LABEL_UNITS.has(value)) properties.labelUnit = value;
+      else if (key === "labelColor" && typeof value === "string") properties.labelColor = fill(value);
+      else if (key === "dateBreaks" && typeof value === "string") properties.dateBreaks = value;
+      else if (key === "position" && axis2 === "y" && (value === "left" || value === "right")) properties.position = value;
       else residual = true;
     }
     const liveCfg = live.scales?.[axis2];
     const liveEntries = liveCfg === void 0 ? {} : typeof liveCfg === "string" ? { type: liveCfg } : liveCfg;
     for (const [key, prop] of Object.entries(SCALE_PROP)) {
       if (liveEntries[key] === void 0 || key in entries) continue;
-      revert(properties, objectName, prop);
+      if (prop === "dateBreaks") properties.dateBreaks = "";
+      else revert(properties, objectName, prop);
     }
     add(objectName, properties);
   };
@@ -40075,14 +40723,26 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     }
   }
   {
-    const FACET_PROP = { ncol: "columns", freeX: "freeX", freeY: "freeY" };
+    const FACET_PROP = {
+      ncol: "columns",
+      freeX: "freeX",
+      freeY: "freeY",
+      heights: "heights",
+      strips: "strips",
+      rowAxes: "rowAxes"
+    };
     const properties = {};
     if (patch.facet) {
       for (const [key, value] of Object.entries(patch.facet)) {
         if (key === "ncol" && typeof value === "number") properties.columns = value;
         else if (key === "freeX" && typeof value === "boolean") properties.freeX = value;
         else if (key === "freeY" && typeof value === "boolean") properties.freeY = value;
-        else if (key === "wrap" || key === "row" || key === "col") {
+        else if (key === "heights" && Array.isArray(value) && value.length > 0 && value.every((h) => typeof h === "number" && h > 0)) {
+          properties.heights = value.join(",");
+        } else if (key === "strips" && typeof value === "boolean") properties.strips = value;
+        else if (key === "rowAxes" && Array.isArray(value) && value.length > 0 && value.every((e) => parseRowAxes(e) !== void 0)) {
+          properties.rowAxes = value.join(",");
+        } else if (key === "wrap" || key === "row" || key === "col") {
           const liveFacet2 = live.facet;
           if (liveFacet2?.[key] !== value) residual = true;
         } else residual = true;
@@ -40094,7 +40754,9 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     for (const [key, prop] of Object.entries(FACET_PROP)) {
       if (liveFacet[key] === void 0) continue;
       if (patch.facet && key in patch.facet) continue;
-      revert(properties, "facet", prop);
+      if (prop === "heights" || prop === "rowAxes") properties[prop] = "";
+      else if (prop === "strips") properties.strips = true;
+      else revert(properties, "facet", prop);
     }
     add("facet", properties);
   }

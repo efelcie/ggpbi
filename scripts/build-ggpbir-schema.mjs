@@ -62,7 +62,19 @@ const NUMBER = literal({ type: 'string', pattern: '^-?[0-9]+(\\.[0-9]+)?[DL]?$' 
 const TEXT = literal({ type: 'string', pattern: "^'[\\s\\S]*'$" });
 const ENUM = (values) => literal({ type: 'string', enum: values.map((v) => `'${v}'`) });
 
-// A fill accepts a plain hex string, an expression, or a report-theme colour.
+// A fill is a string literal (the hex colour, quoted) or a report-theme
+// colour — the forms Power BI Desktop writes. The bare `"color": "#hex"`
+// of theme files is rejected: in visual.json the service drops it and the
+// chart silently falls back to its default colours.
+const THEME_DATA_COLOR = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['ColorId'],
+  properties: {
+    ColorId: { type: 'integer' },
+    Percent: { type: 'number' },
+  },
+};
 const FILL = {
   type: 'object',
   additionalProperties: false,
@@ -75,23 +87,25 @@ const FILL = {
       properties: {
         color: {
           oneOf: [
-            { type: 'string' },
-            literal({ type: 'string' }),
+            literal({ type: 'string', pattern: "^'#[0-9A-Fa-f]{3,8}'$" }),
+            {
+              type: 'object',
+              additionalProperties: false,
+              required: ['expr'],
+              properties: {
+                expr: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['ThemeDataColor'],
+                  properties: { ThemeDataColor: THEME_DATA_COLOR },
+                },
+              },
+            },
             {
               type: 'object',
               additionalProperties: false,
               required: ['ThemeDataColor'],
-              properties: {
-                ThemeDataColor: {
-                  type: 'object',
-                  additionalProperties: false,
-                  required: ['ColorId'],
-                  properties: {
-                    ColorId: { type: 'integer' },
-                    Percent: { type: 'number' },
-                  },
-                },
-              },
+              properties: { ThemeDataColor: THEME_DATA_COLOR },
             },
           ],
         },

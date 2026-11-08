@@ -26,8 +26,9 @@ import { parseR } from './r-parse';
 import { computePaneWriteback } from './pane-writeback';
 import { specToCode } from './codegen';
 import { ggpbirText, parseGgpbir, ggpbirReadOnlyMatches, type GgpbirContext } from './ggpbir-codegen';
-import { fromDataView, DEFAULT_ROLE_MAPPING, NUMBERED_ROLES, resolveLabelBinding, restoreSharedFieldAliases, resolveSoloMeasureMode, resolveReferencePositions, isDataTruncated } from './powerbi';
+import { fromDataView, DEFAULT_ROLE_MAPPING, NUMBERED_ROLES, resolveLabelBinding, restoreSharedFieldAliases, resolveSoloMeasureMode, resolveReferencePositions, isDataTruncated, resolveColor } from './powerbi';
 import { inferGeom } from './auto-geom';
+import { parseHeights, parseRowAxesText } from './facet-layout';
 import { themeDark, themeMinimal, GREY_DEFAULTS } from './theme';
 import { explainError } from './friendly-errors';
 import type { Selection } from './selection';
@@ -576,12 +577,15 @@ export class Visual implements IVisual {
       const extractEnum = (val: any): string =>
         typeof val === 'object' ? val?.value ?? '' : String(val ?? '');
 
-      const extractFill = (val: any): string | undefined => {
-        if (!val) return undefined;
-        if (typeof val === 'object' && val?.value && val.value !== '') return val.value;
-        if (typeof val === 'string' && val !== '') return val;
-        return undefined;
-      };
+      // Colours: the report's own object first, the slice value second. The
+      // formatting model only understands `{ solid: { color } }`; a colour
+      // that reaches the visual in any other shape (a bare PBIR literal,
+      // an unresolved expression) left the slice at its default and the
+      // chart in the default colours.
+      const rawObjects = (dataView.metadata?.objects ?? {}) as Record<string, Record<string, unknown>>;
+      const extractFill = (val: any, objectName?: string, property?: string): string | undefined =>
+        (objectName && property ? resolveColor(rawObjects[objectName]?.[property]) : undefined)
+        ?? resolveColor(val);
 
       // Y field names for each layer (up to 3).
       // We support a mix of:
@@ -623,11 +627,11 @@ export class Visual implements IVisual {
           ? resolvedType as GeomType
           : inferGeom(data, aesMapping).type;
         resolvedInfo[li] = { type: layerType, auto: isAutoType };
-        const layerFill = extractFill(layerSettings.fill.value);
+        const layerFill = extractFill(layerSettings.fill.value, `layer${li + 1}`, 'fill');
         const layerLinetype = extractEnum((layerSettings as any).lineStyle?.value) as LinetypeType || undefined;
         const layerPosition = extractEnum((layerSettings as any).position?.value) as PositionType || undefined;
         const layerShape = extractEnum((layerSettings as any).shape?.value) as ShapeType || undefined;
-        const layerPointFill = extractFill((layerSettings as any).pointFill?.value);
+        const layerPointFill = extractFill((layerSettings as any).pointFill?.value, `layer${li + 1}`, 'pointFill');
         const layerStrokeWidth = (layerSettings as any).strokeWidth?.value as number | undefined;
         const layerJitterWidth = (layerSettings as any).jitterWidth?.value as number | undefined;
         const layerJitterHeight = (layerSettings as any).jitterHeight?.value as number | undefined;
@@ -698,6 +702,13 @@ export class Visual implements IVisual {
             ...(layerApplyHighlight === false && { highlight: false }),
             ...(layerFilter && layerFilter !== 'none' && { filter: layerFilter }),
             ...(layerLabelTemplate && { labelTemplate: layerLabelTemplate }),
+            // Direct labels and the highlighted last bar (only when set).
+            ...(layerSettings.endPoint.value && { endPoint: true }),
+            ...(layerSettings.endLabel.value && { endLabel: true }),
+            ...((): { lastFill?: string } => {
+              const last = extractFill(layerSettings.lastFill.value, `layer${li + 1}`, 'lastFill');
+              return last ? { lastFill: last } : {};
+            })(),
           } as GeomConfig,
           aes: layerAes,
         });
@@ -718,7 +729,7 @@ export class Visual implements IVisual {
           geom.boxOutlierSize = bp.outlierSize.value;
           const bpWidth = bp.boxWidth.value;
           if (bpWidth != null && bpWidth !== 0.9) geom.width = bpWidth;
-          const bpFill = extractFill(bp.boxFillColor.value);
+          const bpFill = extractFill(bp.boxFillColor.value, 'boxplot', 'boxFillColor');
           if (bpFill) geom.color = bpFill;
           const bpOutlierShape = extractEnum(bp.outlierShape.value) as ShapeType || undefined;
           if (bpOutlierShape && bpOutlierShape !== 'circle') geom.boxOutlierShape = bpOutlierShape;
@@ -745,9 +756,9 @@ export class Visual implements IVisual {
           if (histDrop && histDrop !== 'none') geom.drop = histDrop;
           const histYAxis = extractEnum(hist.histYAxis.value) as 'count' | 'density' | 'ncount' | 'ndensity';
           if (histYAxis && histYAxis !== 'count') geom.yAxis = histYAxis;
-          const histFill = extractFill(hist.histFillColor.value);
+          const histFill = extractFill(hist.histFillColor.value, 'histogram', 'histFillColor');
           if (histFill) geom.color = histFill;
-          const histBorder = extractFill(hist.histBorderColor.value);
+          const histBorder = extractFill(hist.histBorderColor.value, 'histogram', 'histBorderColor');
           if (histBorder) geom.stroke = histBorder;
           const histBorderWidth = hist.histBorderWidth.value;
           if (histBorderWidth != null && histBorderWidth !== 0.5) geom.strokeWidth = histBorderWidth;
@@ -773,7 +784,7 @@ export class Visual implements IVisual {
           const smN = sm.n.value;
           if (smN != null && smN !== 80) geom.n = smN;
           geom.fullrange = sm.fullrange.value;
-          const smFill = extractFill(sm.smoothFillColor.value);
+          const smFill = extractFill(sm.smoothFillColor.value, 'smooth', 'smoothFillColor');
           if (smFill) geom.fill = smFill;
           const smFillAlpha = sm.fillAlpha.value;
           if (smFillAlpha != null && smFillAlpha !== 0.4) geom.fillAlpha = smFillAlpha;
@@ -828,7 +839,7 @@ export class Visual implements IVisual {
       const refCard = s.referenceLines;
       if (refCard.show.value) {
         const refStyle = {
-          color: extractFill(refCard.lineColor.value) ?? '#E15759',
+          color: extractFill(refCard.lineColor.value, 'referenceLines', 'lineColor') ?? '#E15759',
           linetype: (extractEnum(refCard.lineStyle.value) || 'dashed') as LinetypeType,
           size: refCard.lineWidth.value ?? 1,
         };
@@ -888,16 +899,10 @@ export class Visual implements IVisual {
       const legendPosition = (s.legend.position?.value as string) || 'right';
 
       // Read theme properties from Format Pane (set by user or by PBI Style Presets)
-      const extractColor = (val: any): string | undefined => {
-        if (!val) return undefined;
-        if (typeof val === 'string' && val) return val;
-        if (typeof val === 'object' && val?.value && val.value !== '') return val.value;
-        return undefined;
-      };
-      const themePanelFill = extractColor(s.theme.panelFill.value);
-      const themeGridColor = extractColor(s.theme.gridlineColor.value);
-      const themeInk = extractColor(s.theme.ink.value);
-      const themePaper = extractColor(s.theme.paper.value);
+      const themePanelFill = extractFill(s.theme.panelFill.value, 'theme', 'panelFill');
+      const themeGridColor = extractFill(s.theme.gridlineColor.value, 'theme', 'gridlineColor');
+      const themeInk = extractFill(s.theme.ink.value, 'theme', 'ink');
+      const themePaper = extractFill(s.theme.paper.value, 'theme', 'paper');
       const themeBaseSize = s.theme.baseSize.value;
 
       // Build theme: preset first, then individual pickers, then the host
@@ -918,6 +923,13 @@ export class Visual implements IVisual {
       if (themeInk && themeInk !== GREY_DEFAULTS.ink) themeConfig.ink = themeInk;
       if (themePaper && themePaper !== GREY_DEFAULTS.paper) themeConfig.paper = themePaper;
       if (themeBaseSize && themeBaseSize !== 11) themeConfig.baseSize = themeBaseSize;
+      // Panel elements: only switched-off ones reach the spec (defaults on).
+      if (s.theme.gridX.value === false) themeConfig.gridX = false;
+      if (s.theme.gridY.value === false) themeConfig.gridY = false;
+      if (s.theme.gridMinor.value === false) themeConfig.gridMinor = false;
+      if (s.theme.ticks.value === false) themeConfig.ticks = false;
+      const fontFamily = String(s.theme.fontFamily.value ?? '').trim();
+      if (fontFamily) themeConfig.fontFamily = fontFamily;
       if (isHighContrast) themeConfig.isHighContrast = true;
       // Host palette ALWAYS overrides — PBI-native colors have priority
       if (hostPalette.length > 0) themeConfig.colorPalette = hostPalette;
@@ -953,24 +965,39 @@ export class Visual implements IVisual {
             ...(currencyCode && { currency: currencyCode }),
           },
           fieldLabels,
-          ...(scaleX || scaleY || labelFormatX || labelFormatY || dateFormatX || dateFormatY ? {
-            scales: {
-              ...((scaleX || labelFormatX || dateFormatX) && {
-                x: {
-                  ...(scaleX && { type: scaleX }),
-                  ...(labelFormatX && { labels: labelFormatX }),
-                  ...(dateFormatX && { dateLabels: dateFormatX }),
-                },
-              }),
-              ...((scaleY || labelFormatY || dateFormatY) && {
-                y: {
-                  ...(scaleY && { type: scaleY }),
-                  ...(labelFormatY && { labels: labelFormatY }),
-                  ...(dateFormatY && { dateLabels: dateFormatY }),
-                },
-              }),
-            },
-          } : {}),
+          ...((): { scales?: PlotSpec['scales'] } => {
+            // Only what differs from the pane defaults reaches the spec, so
+            // the generated code stays as short as the chart is plain.
+            const axisExtras = (card: typeof s.scaleX | typeof s.scaleY, objectName: string) => {
+              const unit = extractDropdown(card.labelUnit.value);
+              // Empty picker = theme colour.
+              const color = extractFill(card.labelColor.value, objectName, 'labelColor');
+              const breaks = String(card.dateBreaks.value ?? '').trim();
+              return {
+                ...(unit && unit !== 'none' && { labelUnit: unit as import('./types').AxisScaleConfig['labelUnit'] }),
+                ...(color && { labelColor: color }),
+                ...(breaks && { dateBreaks: breaks }),
+              };
+            };
+            const x = {
+              ...(scaleX && { type: scaleX }),
+              ...(labelFormatX && { labels: labelFormatX }),
+              ...(dateFormatX && { dateLabels: dateFormatX }),
+              ...axisExtras(s.scaleX, 'scaleX'),
+            };
+            const y = {
+              ...(scaleY && { type: scaleY }),
+              ...(labelFormatY && { labels: labelFormatY }),
+              ...(dateFormatY && { dateLabels: dateFormatY }),
+              ...axisExtras(s.scaleY, 'scaleY'),
+              ...(extractDropdown(s.scaleY.position.value) === 'right' && { position: 'right' as const }),
+            };
+            const hasX = Object.keys(x).length > 0;
+            const hasY = Object.keys(y).length > 0;
+            return hasX || hasY
+              ? { scales: { ...(hasX && { x }), ...(hasY && { y }) } }
+              : {};
+          })(),
           xLabel,
           yLabel,
           showLegend,
@@ -979,7 +1006,7 @@ export class Visual implements IVisual {
           ...(s.highlight.enabled.value && String(s.highlight.values.value ?? '').trim() !== '' && colorFieldName ? (() => {
             const wanted = String(s.highlight.values.value ?? '')
               .split(',').map(v => v.trim()).filter(Boolean);
-            const unhlColor = extractFill(s.highlight.color.value) || '#BEBEBE';
+            const unhlColor = extractFill(s.highlight.color.value, 'highlight', 'color') || '#BEBEBE';
             return {
               highlight: {
                 filter: (row: DataPoint) => wanted.includes(String(row[colorFieldName])),
@@ -998,6 +1025,15 @@ export class Visual implements IVisual {
               ...(facetColumns > 0 && { ncol: facetColumns }),
               ...(s.facet.freeX.value && { freeX: true }),
               ...(s.facet.freeY.value && { freeY: true }),
+              ...((): { heights?: number[] } => {
+                const heights = parseHeights(s.facet.heights.value);
+                return heights ? { heights } : {};
+              })(),
+              ...(s.facet.strips.value === false && { strips: false }),
+              ...((): { rowAxes?: string[] } => {
+                const rowAxes = parseRowAxesText(s.facet.rowAxes.value);
+                return rowAxes ? { rowAxes } : {};
+              })(),
             },
           }),
           width: options.viewport.width,
