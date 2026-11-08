@@ -492,14 +492,31 @@ export interface GgpbiObjects {
 }
 
 /**
- * Resolve a color value from PBI metadata.
- * Handles plain hex, { solid: { color } }, and ThemeDataColor expressions.
+ * Resolve a colour value from Power BI metadata or the Format Pane model.
+ *
+ * Power BI normally hands a visual `{ solid: { color: "#hex" } }`, already
+ * resolved from the report's expression. Every other shape a colour can
+ * take on the way is accepted too, so a colour that reaches the visual
+ * is never silently dropped:
+ *
+ * - `"#hex"` and a quoted literal `"'#hex'"`
+ * - `{ value: … }` — the formatting model's slice value
+ * - `{ solid: { color: … } }` — with a string or an expression inside
+ * - `{ expr: { Literal: { Value: "'#hex'" } } }` — the PBIR expression form
+ * - `ThemeDataColor` (with a palette to resolve it against)
  */
 export function resolveColor(val: any, palette: string[] = []): string | undefined {
-  if (!val) return undefined;
-  if (typeof val === 'string') return val;
-  if (val?.solid?.color) return val.solid.color;
-  const tdc = val?.expr?.ThemeDataColor ?? val?.ThemeDataColor;
+  if (val == null) return undefined;
+  if (typeof val === 'string') {
+    const s = val.trim().replace(/^'(.*)'$/s, '$1').trim();
+    return s === '' ? undefined : s;
+  }
+  if (typeof val !== 'object') return undefined;
+  if ('solid' in val) return resolveColor(val.solid?.color, palette);
+  if ('value' in val) return resolveColor(val.value, palette);
+  const literal = val.expr?.Literal?.Value;
+  if (typeof literal === 'string') return resolveColor(literal, palette);
+  const tdc = val.expr?.ThemeDataColor ?? val.ThemeDataColor;
   if (tdc && palette.length > 0) {
     const base = palette[tdc.ColorId % palette.length];
     return tdc.Percent ? adjustBrightness(base, tdc.Percent) : base;

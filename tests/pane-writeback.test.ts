@@ -208,6 +208,22 @@ describe('deleted lines write their defaults back — nothing snaps back on clos
     expect(result.residual).toBe(false);
   });
 
+  it('facet row heights write back as the pane text and revert to empty', () => {
+    const set = writebackOf(
+      "ggpbi()\n  .aes({ x: 'wt', y: 'mpg' })\n  .geom('point')\n  .facet({ wrap: 'cyl', heights: [4, 1] })\n  .renderTo(element);",
+      live({ facet: { wrap: 'cyl' } }),
+    );
+    expect(propsOf(set, 'facet')).toEqual({ heights: '4,1' });
+    expect(set.residual).toBe(false);
+
+    const deleted = writebackOf(
+      "ggpbi()\n  .aes({ x: 'wt', y: 'mpg' })\n  .geom('point')\n  .facet({ wrap: 'cyl' })\n  .renderTo(element);",
+      live({ facet: { wrap: 'cyl', heights: [4, 1] } }),
+    );
+    expect(propsOf(deleted, 'facet')).toEqual({ heights: '' });
+    expect(deleted.residual).toBe(false);
+  });
+
   it('without a known default the overlay keeps covering the deletion', () => {
     const result = writebackOf(BARE, live({ theme: { panelFill: '#333333' } }), {});
     expect(propsOf(result, 'theme')).toBeUndefined();

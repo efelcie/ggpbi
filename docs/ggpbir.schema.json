@@ -609,9 +609,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -633,7 +630,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -877,9 +908,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -901,7 +929,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -1616,9 +1678,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -1640,7 +1699,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -1884,9 +1977,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -1908,7 +1998,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -2623,9 +2747,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -2647,7 +2768,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -2891,9 +3046,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -2915,7 +3067,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -4096,9 +4282,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -4120,7 +4303,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -4562,9 +4779,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -4586,7 +4800,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -4641,9 +4889,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -4665,7 +4910,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5036,9 +5315,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5060,7 +5336,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5232,9 +5542,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5256,7 +5563,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5311,9 +5652,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5335,7 +5673,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5390,9 +5762,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5414,7 +5783,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5469,9 +5872,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5493,7 +5893,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -5867,9 +6301,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -5891,7 +6322,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -6281,9 +6746,6 @@
                         "color": {
                           "oneOf": [
                             {
-                              "type": "string"
-                            },
-                            {
                               "type": "object",
                               "additionalProperties": false,
                               "required": [
@@ -6305,7 +6767,41 @@
                                       ],
                                       "properties": {
                                         "Value": {
-                                          "type": "string"
+                                          "type": "string",
+                                          "pattern": "^'#[0-9A-Fa-f]{3,8}'$"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "expr"
+                              ],
+                              "properties": {
+                                "expr": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "ThemeDataColor"
+                                  ],
+                                  "properties": {
+                                    "ThemeDataColor": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "ColorId"
+                                      ],
+                                      "properties": {
+                                        "ColorId": {
+                                          "type": "integer"
+                                        },
+                                        "Percent": {
+                                          "type": "number"
                                         }
                                       }
                                     }
@@ -6524,6 +7020,37 @@
                                 "true",
                                 "false"
                               ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "heights": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "pattern": "^'[\\s\\S]*'$"
                             }
                           }
                         }

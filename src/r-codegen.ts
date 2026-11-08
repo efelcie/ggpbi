@@ -144,7 +144,7 @@ export function specToR(spec: PlotSpec, labels: CodeFieldLabels = {}): string {
   }
 
   if (spec.facet) {
-    const { wrap, row, col, ncol, nrow, freeX, freeY } = spec.facet;
+    const { wrap, row, col, ncol, nrow, freeX, freeY, heights } = spec.facet;
     const scalesArg =
       freeX && freeY ? ', scales = "free"'
         : freeX ? ', scales = "free_x"'
@@ -154,6 +154,11 @@ export function specToR(spec: PlotSpec, labels: CodeFieldLabels = {}): string {
       lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg})`);
     } else if (row || col) {
       lines.push(`  facet_grid(${row ? rName(row) : '.'} ~ ${col ? rName(col) : '.'}${scalesArg})`);
+    }
+    // Relative row heights: ggplot2 itself has no fixed-ratio panel
+    // sizes; ggh4x's force_panelsizes is the closest equivalent.
+    if (heights && heights.length > 0 && (wrap || row || col)) {
+      lines.push(`  ggh4x::force_panelsizes(rows = c(${heights.join(', ')}))`);
     }
   }
 

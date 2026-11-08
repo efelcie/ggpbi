@@ -2110,6 +2110,7 @@
         },
         "baseSize": {
           "displayName": "Font size",
+          "description": "Base font size in px (ggplot2 base_size); every text size, tick length and margin derives from it. Up to 72 — a page laid out at 3× device pixels needs about 3 × 11 to 3 × 14.",
           "type": {
             "numeric": true
           }
@@ -2365,6 +2366,13 @@
           "description": "Each panel scales its Y axis to its own data (ggplot2 scales = \"free_y\").",
           "type": {
             "bool": true
+          }
+        },
+        "heights": {
+          "displayName": "Row heights",
+          "description": "Relative heights of the panel rows, e.g. \"4,1\": the first row four times as tall as the second. Recycled over the rows; empty = equal rows (patchwork heights, ggh4x::force_panelsizes).",
+          "type": {
+            "text": true
           }
         }
       }

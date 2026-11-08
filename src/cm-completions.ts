@@ -25,7 +25,7 @@ const GEOM_OPTIONS = [
 ];
 
 const SCALE_KEYS = ['type', 'min', 'max', 'labels', 'dateLabels'];
-const FACET_KEYS = ['wrap', 'row', 'col', 'ncol', 'nrow', 'freeX', 'freeY'];
+const FACET_KEYS = ['wrap', 'row', 'col', 'ncol', 'nrow', 'freeX', 'freeY', 'heights'];
 /** Editable theme keys — the host-owned ones are greyed, not suggested. */
 const THEME_KEYS = ['preset', 'panelFill', 'gridColor', 'ink', 'paper', 'baseSize'];
 const THEME_PRESETS = ['grey', 'minimal', 'dark'];
@@ -144,7 +144,7 @@ function ggpbiCompletionsWith(context: CompletionContext, fields: string[]): Com
 const R_FUNCTIONS = [
   ...Object.values(GEOM_TO_R),
   'scale_x_log10', 'scale_y_log10', 'scale_x_continuous', 'scale_y_continuous',
-  'facet_wrap', 'facet_grid', 'gghighlight', 'labs',
+  'facet_wrap', 'facet_grid', 'ggh4x::force_panelsizes', 'gghighlight', 'labs',
   'theme_ggpbi', 'theme_minimal', 'theme_dark', 'theme_grey',
 ];
 
@@ -156,7 +156,7 @@ const R_AES_ARGS = [
 const R_NAMED_ARGS = [
   'alpha', 'size', 'colour', 'fill', 'linetype', 'position', 'shape',
   'method', 'se', 'bins', 'binwidth', 'stat', 'ncol', 'nrow', 'scales',
-  'limits', 'labels', 'subtitle', 'trans',
+  'limits', 'labels', 'subtitle', 'trans', 'rows',
 ];
 
 /** A bare R name, backticked for suggestions when R would reject it. */

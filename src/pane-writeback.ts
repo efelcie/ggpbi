@@ -230,14 +230,20 @@ export function computePaneWriteback(
 
   // --- facet: the field is a well; the layout options are properties ---
   {
-    const FACET_PROP: Record<string, string> = { ncol: 'columns', freeX: 'freeX', freeY: 'freeY' };
+    const FACET_PROP: Record<string, string> = {
+      ncol: 'columns', freeX: 'freeX', freeY: 'freeY', heights: 'heights',
+    };
     const properties: Record<string, unknown> = {};
     if (patch.facet) {
       for (const [key, value] of Object.entries(patch.facet)) {
         if (key === 'ncol' && typeof value === 'number') properties.columns = value;
         else if (key === 'freeX' && typeof value === 'boolean') properties.freeX = value;
         else if (key === 'freeY' && typeof value === 'boolean') properties.freeY = value;
-        else if (key === 'wrap' || key === 'row' || key === 'col') {
+        else if (key === 'heights' && Array.isArray(value)
+          && value.length > 0 && value.every(h => typeof h === 'number' && h > 0)) {
+          // The pane holds row heights as text: [4, 1] → "4,1".
+          properties.heights = value.join(',');
+        } else if (key === 'wrap' || key === 'row' || key === 'col') {
           const liveFacet = live.facet as Record<string, unknown> | undefined;
           if (liveFacet?.[key] !== value) residual = true; // rebinding is well work
         } else residual = true;
@@ -252,7 +258,9 @@ export function computePaneWriteback(
     for (const [key, prop] of Object.entries(FACET_PROP)) {
       if (liveFacet[key] === undefined) continue;
       if (patch.facet && key in patch.facet) continue;
-      revert(properties, 'facet', prop);
+      // Empty text is the row-heights default (equal rows).
+      if (prop === 'heights') properties.heights = '';
+      else revert(properties, 'facet', prop);
     }
     add('facet', properties);
   }

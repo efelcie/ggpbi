@@ -1538,15 +1538,22 @@ Format continuous axis tick labels — like `scale_x_continuous(labels = scales:
 
 | Value | Behavior |
 |-------|----------|
-| `'auto'` (default) | Plain numbers, minimal decimals, no group separators — ggplot2's look |
-| `'thousands'` | Group separators |
-| `'compact'` | Short scale: `1.2M`, `450K` |
+| `'auto'` (default) | Plain numbers, minimal decimals, no group separators — ggplot2's look (`format()`) |
+| `'thousands'` | Group separators — `scales::label_comma()` |
+| `'compact'` | Short scale: `1.2M`, `450K` — `scales::label_number(scale_cut = cut_short_scale())` |
 | `'currency'` | Currency symbol; the code comes from `.format({ currency })` |
 | `'percent'` | Value × 100 with `%` suffix; decimals computed on the percent values |
 | function | Called with each break value, returns the label string |
 
 Only applies to continuous scales — category axes always show their category
 values. The dynamic left margin (see Themes) accounts for the formatted labels.
+
+Every format takes its decimals from the breaks, like `scales::precision()`:
+as many as it takes to tell neighbouring breaks apart, the same for every
+label. `compact` picks the unit per value and the decimals per unit, as
+`cut_short_scale()` does — `0, 2.5M, 5.0M, 7.5M`; `1.29M … 1.33M` on a narrow
+range; `0, 500K, 1.0M, 1.5M` across a unit boundary. Unlike scales it never
+rounds a lone break in its unit away (`0, 2.5M`, not `0, 2M`).
 
 #### Locale
 
@@ -1622,6 +1629,7 @@ import { themeGrey, themeMinimal, themeDark } from 'ggpbi';
 .theme(themeGrey())       // baseSize = 11
 .theme(themeGrey(16))     // larger for presentations
 .theme(themeGrey(7))      // smaller for dashboard tiles
+.theme(themeGrey(40))     // a page laid out at 3× device pixels (≈ 13 px on the phone)
 
 // Minimal (fewer axis elements)
 .theme(themeMinimal())
@@ -1651,6 +1659,11 @@ Everything derives proportionally from `baseSize`:
 | Axis title | `1.0 × baseSize` | 11px |
 | Tick length | `0.25 × baseSize` | 2.75px |
 | Margins | `0.5 × baseSize` | 5.5px |
+
+**3× layouts.** A Power BI mobile layout is laid out in device pixels at 3×,
+so every pixel size there is three times what the phone shows. Set
+`baseSize` to three times the size you want: `33` reads like ggplot2's
+default 11, `40` like 13. The Format Pane accepts 6–72.
 
 ### Color Palette
 
@@ -1712,6 +1725,9 @@ ggpbi()
 .facet({ wrap: 'region' })              // ~square grid: ceil(sqrt(n)) columns
 .facet({ wrap: 'region', ncol: 2 })     // fixed column count
 .facet({ wrap: 'region', nrow: 2 })     // fixed row count (ncol derived)
+
+// Relative row heights: a flat bar panel under a tall line panel
+.facet({ wrap: 'panel', ncol: 1, freeY: true, heights: [4, 1] })
 ```
 
 **Power BI:** the visual has a single **Facet** well, so a field dropped
@@ -1725,6 +1741,7 @@ panel to a sliver.) The **Facets (Small Multiples)** card overrides it:
 | **Columns** | `0` = automatic (the grid above); any other value fixes the column count |
 | **Free X scale** | Each panel scales X to its own data (ggplot2 `scales = "free_x"`) |
 | **Free Y scale** | Same for Y |
+| **Row heights** | Relative row heights as text, e.g. `4,1` — empty = equal rows |
 
 Free scales matter whenever the panels cover **different ranges** — one
 decade per panel, one region per panel with very different magnitudes.
@@ -1740,10 +1757,42 @@ own data falls into.
 | `nrow` | — | Grid rows for `wrap` (used when `ncol` is not set) |
 | `freeX` | `false` | Each panel gets its own X scale |
 | `freeY` | `false` | Each panel gets its own Y scale |
+| `heights` | equal | Relative row heights, e.g. `[4, 1]`; recycled over the rows like patchwork's `heights` |
 
 Panels are ordered like ggplot2 factor levels: numerically when all level
 values are numbers (`4, 6, 8` — not first-appearance order), alphabetically
 otherwise.
+
+**Panels and scales come from every layer.** Each layer draws the rows where
+its own value is present — ggplot2 drops missing values per layer. A panel
+exists when any layer has rows there, and a panel's value scale trains on
+all of its layers (bars put zero in, a dashed reference line its own range).
+That is the Power BI shape of a "line over bars" chart: one measure per
+layer, each non-blank in its own panel:
+
+```typescript
+// Panel "LTM": sales LTM (line) + prior-year reference (dashed);
+// panel "Per month": monthly sales (bars) — flat, under the line.
+ggpbi()
+  .data(rows)                               // month, panel, ltm, perMonth, priorYear
+  .aes({ x: 'month', y: 'ltm' })
+  .layer({ geom: { type: 'line', size: 2, color: '#416B84' }, aes: { y: 'ltm' } })
+  .layer({ geom: { type: 'bar', color: '#C8C6C4' }, aes: { y: 'perMonth' } })
+  .layer({ geom: { type: 'line', linetype: 'dashed', color: '#8A8886' }, aes: { y: 'priorYear' } })
+  .facet({ wrap: 'panel', ncol: 1, freeY: true, heights: [4, 1] })
+  .renderTo(el);
+```
+
+**Axes sit outside the grid**, as in ggplot2: the x axis under the bottom
+panel of each column (a panel above an empty cell draws its own), the y
+axis left of the first column. A free scale gives every panel its own axis.
+Strip height, axis room and the gap between panels derive from `baseSize`.
+
+**Row heights** fix the panels' relative height — patchwork's
+`plot_layout(heights = c(4, 1))`, or for facets
+`ggh4x::force_panelsizes(rows = c(4, 1))`, which is what the R code view
+writes. ggplot2's own `facet_grid(space = "free_y")` sizes rows by their
+data range instead; `heights` is the fixed ratio.
 
 ---
 
@@ -2243,8 +2292,17 @@ PBIR templates store colors as `{ ThemeDataColor: { ColorId: 0, Percent: 0 } }` 
 ggpbi resolves these expressions automatically:
 
 - **Hex string** → used directly
-- **`{ solid: { color } }`** → Power BI standard format
+- **`{ solid: { color } }`** → Power BI standard format (the host resolves a
+  report's expression to this before the visual sees it)
+- **`{ expr: { Literal: { Value: "'#hex'" } } }`** → the PBIR expression,
+  also inside `solid.color` — applied even when it arrives unresolved
 - **`{ ThemeDataColor: { ColorId, Percent } }`** → color from host palette + brightness adjustment
+
+In a report file (`visual.json`) write colours as the expression —
+`{ "solid": { "color": { "expr": { "Literal": { "Value": "'#416B84'" } } } } }`,
+the form Desktop writes. The bare `{ "solid": { "color": "#416B84" } }` is the
+theme-file form; in `visual.json` the service drops it (see the
+[ggpbir reference](ggpbir-reference.md#value-encoding)).
 
 The function `resolveColor()` in `src/powerbi.ts` handles the resolution.
 `adjustBrightness()` adjusts brightness by percent (positive = lighter, negative = darker).
@@ -2341,6 +2399,7 @@ src/
 ├── scales.ts       Scales (linear, log, sqrt, time, band/ordinal)
 ├── geoms/          Geometries (point, line, bar, col, area, text, boxplot)
 ├── render.ts       Render pipeline (axes, layers, faceting)
+├── facet-layout.ts Facet grid geometry (outer axes, row heights)
 ├── index.ts        Fluent API + exports
 ├── theme.ts        Theme system (ggplot2-style)
 ├── tooltip.ts      Tooltips

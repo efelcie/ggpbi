@@ -1,5 +1,37 @@
 # ggpbi Development Log
 
+## 2026-11-08 - v0.6.0
+
+- Each layer now draws the rows where its own value is present, like
+  ggplot2. A bar layer on its own measure no longer mistook the blank rows
+  of another panel for duplicates and summed the global Y instead: line,
+  bars and dashed reference each draw in their own facet panel. Summing
+  and counting stats run per facet panel and keep it.
+- Facet panels and scales come from every layer: a panel's Y scale trains
+  on all of its layers (bars put zero in), and a measure that is BLANK in
+  some rows no longer drags an axis down to 0.
+- Facets lay out like ggplot2: the x axis under the bottom panel of each
+  column, the y axis left of the first column unless a scale is free;
+  strips, axis room and panel gaps follow `baseSize` instead of fixed
+  pixels, so 3× layouts stay legible.
+- New facet option **Row heights** (`heights`, e.g. `4,1`): relative panel
+  row heights like patchwork's `heights` — a flat bar panel under a tall
+  line panel. The R code view writes `ggh4x::force_panelsizes(rows = …)`.
+- Layer, theme and every other colour is applied whatever shape it reaches
+  the visual in: resolved, as an unresolved PBIR expression or as a bare
+  literal.
+- Corrected the ggpbir colour encoding: a hex colour in `visual.json` is
+  `{ "solid": { "color": { "expr": { "Literal": { "Value": "'#hex'" } } } } }`.
+  The plain `{ "solid": { "color": "#hex" } }` is the theme-file form and
+  is dropped by the Power BI service; the schema now rejects it, and the
+  reference examples are validated against the schema.
+- `compact` labels take their decimals from the breaks like
+  `scales::label_number(scale_cut = cut_short_scale())`: one unit per
+  value, the same decimals within a unit — `7.0M` next to `7.5M`, and
+  `1.29M … 1.33M` instead of five times `1.3M`.
+- The Format Pane font size (`baseSize`) goes up to 72 for pages laid out
+  at 3× device pixels.
+
 ## 2026-08-09 - v0.5.0
 
 - Turned the code view into a real editor (CodeMirror): edit the generated

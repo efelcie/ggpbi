@@ -110,7 +110,8 @@ function tokenize(code: string): Tok[] {
       continue;
     }
     if (/[a-zA-Z.]/.test(ch)) {
-      const m = /[a-zA-Z.][\w.]*/y;
+      // A namespace-qualified name (ggh4x::force_panelsizes) is one token.
+      const m = /[a-zA-Z.][\w.]*(?:::[a-zA-Z.][\w.]*)?/y;
       m.lastIndex = i;
       const hit = m.exec(code)!;
       toks.push({ kind: 'ident', text: hit[0], line });
@@ -364,6 +365,23 @@ function mapScale(call: RCall, patch: CodePatch): void {
   patch.scales = { ...(patch.scales ?? {}), [axis]: cfg };
 }
 
+/**
+ * ggh4x::force_panelsizes(rows = c(4, 1)) — relative row heights, the
+ * facet's `heights`. Only `rows` has a ggpbi counterpart.
+ */
+function mapPanelSizes(call: RCall, patch: CodePatch): void {
+  for (const arg of call.args) {
+    if (arg.name !== 'rows') {
+      throw new ParseError(`force_panelsizes(${arg.name ?? '…'} = …) is not supported — only rows = c(…)`, arg.line);
+    }
+    const v = Array.isArray(arg.value) ? arg.value : [arg.value];
+    if (v.length === 0 || !v.every(h => typeof h === 'number' && h > 0)) {
+      throw new ParseError('rows needs positive numbers, e.g. c(4, 1)', arg.line);
+    }
+    patch.facet = { ...(patch.facet ?? {}), heights: v as number[] };
+  }
+}
+
 function mapFacet(call: RCall, patch: CodePatch): void {
   const facet: Record<string, unknown> = {};
   for (const arg of call.args) {
@@ -392,7 +410,9 @@ function mapFacet(call: RCall, patch: CodePatch): void {
     }
     throw new ParseError(`${call.fn}(${arg.name} = …) is not supported`, arg.line);
   }
-  patch.facet = facet;
+  // Panel sizes may come before or after the facet call.
+  const heights = (patch.facet as { heights?: number[] } | undefined)?.heights;
+  patch.facet = heights ? { ...facet, heights } : facet;
 }
 
 /**
@@ -428,6 +448,10 @@ export function parseR(code: string): ParseResult {
       }
       if (call.fn === 'facet_wrap' || call.fn === 'facet_grid') {
         mapFacet(call, patch);
+        continue;
+      }
+      if (call.fn === 'ggh4x::force_panelsizes' || call.fn === 'force_panelsizes') {
+        mapPanelSizes(call, patch);
         continue;
       }
       if (call.fn === 'gghighlight') {

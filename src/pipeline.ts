@@ -14,7 +14,7 @@ import * as d3 from 'd3';
 import type { PlotSpec, DataPoint, AesMapping, GeomConfig, Layer, StatType, ScaleType, AxisScaleConfig, LabelFormat } from './types';
 import { bindData, validateAes, type BoundPoint } from './bind-data';
 import { createScale, inferScaleType, createSizeScale, type GgpbiScale, type BandScaleOptions } from './scales';
-import { stats, DEFAULT_GEOM_STAT } from './stats';
+import { stats, DEFAULT_GEOM_STAT, type StatResult } from './stats';
 import { inferGeom } from './auto-geom';
 import { computePosition } from './position';
 import { continuousBandPx } from './geoms/util';
@@ -281,11 +281,12 @@ function hasMultipleRowsPerGroup(
   data: DataPoint[] | undefined,
   aes: AesMapping,
   horizontal: boolean,
+  facetFields: string[] = [],
 ): boolean {
   if (!data || data.length === 0) return false;
   const catField = horizontal ? aes.y : aes.x;
   if (!catField) return false;
-  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol]
+  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol, ...facetFields]
     .filter((f): f is string => !!f);
   const seen = new Set<string>();
   for (const d of data) {
@@ -296,10 +297,35 @@ function hasMultipleRowsPerGroup(
   return false;
 }
 
+/** The fields a facet spec splits panels by (wrap, or row and col). */
+export function facetFields(facet?: PlotSpec['facet']): string[] {
+  if (!facet) return [];
+  if (facet.wrap) return [facet.wrap];
+  return [facet.row, facet.col].filter((f): f is string => !!f);
+}
+
+/** Missing in the ggplot2 sense: null, undefined, '' or NaN. */
+export function isMissingValue(v: unknown): boolean {
+  return v == null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+}
+
+/**
+ * The rows a layer actually draws from: those where its own value
+ * aesthetic is present. ggplot2 drops missing values per layer
+ * (remove_missing), so a row that only carries another layer's measure
+ * — Power BI delivers one row per (category × facet) when any measure is
+ * non-blank — does not count towards this layer's groups.
+ */
+function rowsWithValue(data: DataPoint[] | undefined, field: string | undefined): DataPoint[] | undefined {
+  if (!data || !field) return data;
+  return data.filter(d => !isMissingValue(d[field]));
+}
+
 export function resolveLayerStat(
   layer: Layer,
   globalAes: AesMapping,
   data?: DataPoint[],
+  facet?: PlotSpec['facet'],
 ): StatType {
   // Explicit stat on layer or geom config wins
   const explicit = layer.stat ?? layer.geom.stat;
@@ -314,12 +340,20 @@ export function resolveLayerStat(
   // put categories on y and the value on x.
   if (defaultStat === 'count') {
     const horizontal = ('orientation' in layer.geom) && layer.geom.orientation === 'y';
-    const valueMapped = horizontal ? !!globalAes.x : !!globalAes.y;
-    if (valueMapped) {
-      // Several rows per (category × colour) → sum them instead of
-      // drawing one rectangle per row (see statSumFn). Power BI sends
-      // this shape whenever a column is set to "Don't summarize".
-      return hasMultipleRowsPerGroup(data, globalAes, horizontal) ? 'sum' : 'identity';
+    // The layer's own mapping decides: Power BI binds each layer to its
+    // own measure (y2 for layer 2) on top of the global y.
+    const aes = mergeAes(globalAes, layer.aes ?? layer.geom.aes);
+    const valueField = horizontal ? aes.x : aes.y;
+    if (valueField) {
+      // Several rows per (category × colour × panel) → sum them instead
+      // of drawing one rectangle per row (see statSumFn). Power BI sends
+      // this shape whenever a column is set to "Don't summarize". Only
+      // rows that carry this layer's value count, and every facet panel
+      // is its own group — otherwise one bar per month in panel B looks
+      // like a duplicate of the blank row in panel A.
+      return hasMultipleRowsPerGroup(rowsWithValue(data, valueField), aes, horizontal, facetFields(facet))
+        ? 'sum'
+        : 'identity';
     }
   }
 
@@ -376,11 +410,18 @@ export function computeStat(
   // Find the first layer that needs a non-identity, non-per-layer stat.
   // Per-layer stats (smooth) are handled in computeLayerBindings instead.
   for (const layer of spec.layers) {
-    const statType = resolveLayerStat(layer, spec.aes, data);
+    const statType = resolveLayerStat(layer, spec.aes, data, spec.facet);
     if (statType === 'identity' || statType === 'boxplot' || statType === 'smooth') continue;
 
     const statFn = stats[statType];
-    const result = statFn(data, spec.aes, layer.geom);
+    // The stat reads the layer's own value field (layer 2 sums y2, not
+    // the global y1). Group-by stats run per facet panel, the way ggplot2
+    // computes every stat per PANEL: the facet field must survive the
+    // aggregation, or the panels collapse into one.
+    const statAes = mergeAes(spec.aes, layer.aes ?? layer.geom.aes);
+    const result = statType === 'sum' || statType === 'count'
+      ? statPerPanel(data, spec.facet, part => statFn(part, statAes, layer.geom))
+      : statFn(data, statAes, layer.geom);
 
     // A stat that yields nothing leaves the scales with an empty field, whose
     // error blames the field ("no numeric values") instead of the real cause:
@@ -411,6 +452,36 @@ export function computeStat(
   }
 
   return { spec, data };
+}
+
+/**
+ * Run a stat once per facet panel and keep the panel fields on its rows.
+ * Without a facet this is just `run(data)`.
+ */
+function statPerPanel(
+  data: DataPoint[],
+  facet: PlotSpec['facet'],
+  run: (part: DataPoint[]) => StatResult,
+): StatResult {
+  const fields = facetFields(facet);
+  if (fields.length === 0) return run(data);
+
+  const parts = new Map<string, DataPoint[]>();
+  for (const d of data) {
+    const key = fields.map(f => String(d[f])).join('\u0000');
+    const part = parts.get(key);
+    if (part) part.push(d);
+    else parts.set(key, [d]);
+  }
+  let aesOverrides: Partial<AesMapping> | undefined;
+  const out: DataPoint[] = [];
+  for (const part of parts.values()) {
+    const result = run(part);
+    aesOverrides ??= result.aesOverrides;
+    const panel = Object.fromEntries(fields.map(f => [f, part[0][f]]));
+    for (const row of result.data) out.push({ ...row, ...panel });
+  }
+  return { data: out, ...(aesOverrides && { aesOverrides }) };
 }
 
 // ---------------------------------------------------------------------------
@@ -684,6 +755,75 @@ function createColorScale(
 }
 
 /**
+ * The range a set of bound layers occupies on one continuous axis — what
+ * ggplot2 trains a position scale on: every layer's own values (layer 2's
+ * y2, not just the global y), range ends, stacked extents, and the zero
+ * baseline bars and areas stand on. Missing values are skipped, so a
+ * panel where one layer is blank trains on the layers that are not.
+ *
+ * Undefined when no layer has a finite value on that axis.
+ */
+export function boundExtent(
+  bindings: BoundPoint[][],
+  geoms: GeomConfig[],
+  axis: 'x' | 'y',
+  includeZeroBaseline = true,
+): [number, number] | undefined {
+  let lo = Infinity;
+  let hi = -Infinity;
+  const add = (v: unknown): void => {
+    if (isMissingValue(v)) return;
+    const n = v instanceof Date ? v.getTime() : Number(v);
+    if (!Number.isFinite(n)) return;
+    if (n < lo) lo = n;
+    if (n > hi) hi = n;
+  };
+  const rangeKeys = axis === 'y'
+    ? (['y', 'ymin', 'ymax', 'yend'] as const)
+    : (['x', 'xmin', 'xmax', 'xend'] as const);
+
+  bindings.forEach((points, li) => {
+    const geom = geoms[li];
+    const barLike = !!geom && (geom.type === 'bar' || geom.type === 'col' || geom.type === 'histogram');
+    const horizontal = !!geom && 'orientation' in geom && geom.orientation === 'y';
+    const valueAxis = horizontal ? 'x' : 'y';
+    const onZero = !!geom && standsOnZero(geom, axis);
+    let any = false;
+    for (const p of points as Array<BoundPoint & { _v0?: number; _v1?: number }>) {
+      if (barLike && axis === valueAxis && (p._v0 !== undefined || p._v1 !== undefined)) {
+        // Stacked or filled: the stack edges ARE the drawn extent. A blank
+        // value stacks as a zero-height segment at 0 — it draws nothing
+        // and must not pull the scale to zero.
+        if (isMissingValue(p[axis])) continue;
+        if (Number.isFinite(p._v0) && Number.isFinite(p._v1)) {
+          add(p._v0);
+          add(p._v1);
+          any = true;
+        }
+        continue;
+      }
+      for (const k of rangeKeys) add(p[k]);
+      if (!isMissingValue(p[axis]) && Number.isFinite(Number(p[axis]))) any = true;
+    }
+    if (onZero && includeZeroBaseline && any) add(0);
+  });
+
+  return Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : undefined;
+}
+
+/**
+ * Does this geom stand on zero along `axis`? Bars (vertical: y, horizontal:
+ * x) and vertical areas do — their value scale always includes the
+ * baseline, like ggplot2's ymin = 0.
+ */
+export function standsOnZero(geom: GeomConfig, axis: 'x' | 'y'): boolean {
+  const barLike = geom.type === 'bar' || geom.type === 'col' || geom.type === 'histogram';
+  const horizontal = 'orientation' in geom && geom.orientation === 'y';
+  if (barLike) return axis === (horizontal ? 'x' : 'y');
+  return geom.type === 'area' && axis === 'y';
+}
+
+/**
  * Train scales from data and spec. Pure (creates new scale objects).
  */
 export function trainScales(
@@ -746,6 +886,7 @@ export function trainScales(
     let xMax = -Infinity;
     for (const field of [spec.aes.x!, ...xRangeFields]) {
       for (const d of data) {
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < xMin) xMin = v;
@@ -776,6 +917,9 @@ export function trainScales(
     let yMax = -Infinity;
     for (const field of allYFields) {
       for (const d of data) {
+        // Blank is not zero: Number(null) is 0, and a measure that is
+        // BLANK for half the rows would drag every axis down to 0.
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < yMin) yMin = v;
@@ -783,7 +927,11 @@ export function trainScales(
         }
       }
     }
-    yScale = createScale(data, spec.aes.y!, yType, [innerHeight, 0]);
+    // Build the scale from a field that has values: the global y may be
+    // blank where another layer's measure is not.
+    const scaleField = [spec.aes.y!, ...allYFields].find(f => data.some(d => !isMissingValue(d[f])))
+      ?? spec.aes.y!;
+    yScale = createScale(data, scaleField, yType, [innerHeight, 0]);
     if (isFinite(yMin) && isFinite(yMax)) {
       (yScale as any).domain([yMin, yMax]);
     }
@@ -874,7 +1022,7 @@ export function estimateTextWidth(text: string, fontSize: number): number {
 }
 
 /** d3 axis default tickPadding (gap between tick line and label). */
-const AXIS_TICK_PADDING = 3;
+export const AXIS_TICK_PADDING = 3;
 
 /**
  * Estimate the widest y-axis tick label in px. Pure — mirrors the labels
@@ -900,13 +1048,22 @@ export function estimateYTickLabelWidth(
     // d3 time tick labels are short ("March", "12:00", "2024") — assume ~6 chars
     labels = ['MMMMMM'];
   } else {
+    // Every layer's own y counts — the widest labels may belong to layer 2.
+    const yFields = new Set([yField]);
+    for (const layer of spec.layers) {
+      const layerY = (layer.aes ?? layer.geom.aes)?.y;
+      if (layerY) yFields.add(layerY);
+    }
     let lo = Infinity;
     let hi = -Infinity;
-    for (const d of data) {
-      const v = Number(d[yField]);
-      if (Number.isFinite(v)) {
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
+    for (const field of yFields) {
+      for (const d of data) {
+        if (isMissingValue(d[field])) continue;
+        const v = Number(d[field]);
+        if (Number.isFinite(v)) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
       }
     }
     if (!isFinite(lo) || !isFinite(hi)) return 0;
@@ -1004,7 +1161,7 @@ function resolveSubtitle(
   if (spec.warnAggregated) {
     const descriptions = preStatSpec.layers.map(layer => ({
       geom: layer.geom.type,
-      stat: resolveLayerStat(layer, preStatSpec.aes, rawData),
+      stat: resolveLayerStat(layer, preStatSpec.aes, rawData, preStatSpec.facet),
     }));
     if (shouldWarnAggregated(descriptions, preStatSpec.aes, rawData)) {
       notes.push(AGGREGATION_NOTE);
@@ -1021,7 +1178,7 @@ function resolveSubtitle(
   const autoGeom = inputSpec.layers.length === 0;
   const descriptions: LayerDescription[] = preStatSpec.layers.map(layer => ({
     geom: layer.geom.type,
-    stat: resolveLayerStat(layer, preStatSpec.aes, rawData),
+    stat: resolveLayerStat(layer, preStatSpec.aes, rawData, preStatSpec.facet),
     autoGeom,
   }));
 

@@ -4858,7 +4858,7 @@ function breakDecimals(breaks) {
     if (d > 0 && d < smallestDiff) smallestDiff = d;
   }
   if (smallestDiff < Math.sqrt(Number.EPSILON)) return 1;
-  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff)) - 1);
+  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff) + 1e-9) - 1);
   if (unique.every((v) => Math.round(v / p) % 10 === 0)) p *= 10;
   p = Math.min(p, 1);
   return Math.max(0, -Math.floor(Math.log10(p)));
@@ -4895,13 +4895,70 @@ function formatThousands(breaks, opts = {}) {
   });
   return breaks.map((v) => nf.format(v));
 }
+function compactScale(v, probe) {
+  if (v === 0 || !Number.isFinite(v)) return 1;
+  let digits = "";
+  for (const part of probe.formatToParts(v)) {
+    if (part.type === "integer") digits += part.value;
+    else if (part.type === "decimal") digits += ".";
+    else if (part.type === "fraction") digits += part.value;
+  }
+  const shown = Math.abs(Number(digits));
+  if (!Number.isFinite(shown) || shown === 0) return 1;
+  return Math.pow(10, Math.round(Math.log10(Math.abs(v) / shown)));
+}
 function formatCompact(breaks, opts = {}) {
-  const nf = intl(opts.locale, {
-    notation: "compact",
-    compactDisplay: "short",
-    maximumFractionDigits: 1
+  let probe;
+  try {
+    probe = new Intl.NumberFormat(opts.locale, {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 20,
+      numberingSystem: "latn"
+    });
+  } catch {
+    probe = new Intl.NumberFormat(void 0, {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 20,
+      numberingSystem: "latn"
+    });
+  }
+  const scales = breaks.map((v) => compactScale(v, probe));
+  const groups2 = /* @__PURE__ */ new Map();
+  breaks.forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
+    const scaled = v / scales[i];
+    const group2 = groups2.get(scales[i]);
+    if (group2) group2.push(scaled);
+    else groups2.set(scales[i], [scaled]);
   });
-  return breaks.map((v) => nf.format(v));
+  const exactDecimals = (v) => {
+    for (let d = 0; d < 3; d++) {
+      const f = Math.pow(10, d);
+      if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
+    }
+    return 3;
+  };
+  const decimalsOf = /* @__PURE__ */ new Map();
+  for (const [scale, values] of groups2) {
+    decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
+  }
+  const formatters = /* @__PURE__ */ new Map();
+  const formatterFor = (decimals) => {
+    let nf = formatters.get(decimals);
+    if (!nf) {
+      nf = intl(opts.locale, {
+        notation: "compact",
+        compactDisplay: "short",
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+      formatters.set(decimals, nf);
+    }
+    return nf;
+  };
+  return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
 }
 function formatCurrency(breaks, opts = {}) {
   const decimals = Math.min(breakDecimals(breaks), 2);
@@ -7550,6 +7607,171 @@ var sceneBuilders = {
   pointrange: (pts, xs, ys, cfg, cs) => pointrangeToScene(pts, xs, ys, cfg, cs)
 };
 
+// src/position.ts
+function applyDodge(points, padded = false) {
+  const colorGroups = Array.from(
+    new Set(points.map((d) => String(d.color ?? "__none__")))
+  );
+  const nColors = colorGroups.length;
+  return points.map((d) => ({
+    ...d,
+    _dodgeIndex: colorGroups.indexOf(String(d.color ?? "__none__")),
+    _dodgeN: nColors,
+    _dodgePadded: padded
+  }));
+}
+function applyStack(points, orientation = "x") {
+  const isHorizontal = orientation === "y";
+  const catKey = (d) => String(isHorizontal ? d.y : d.x);
+  const seriesKey = (d) => `${String(d.group ?? "")}|${String(d.color ?? "")}`;
+  const groups2 = /* @__PURE__ */ new Map();
+  for (const d of points) {
+    const key = catKey(d);
+    if (!groups2.has(key)) groups2.set(key, []);
+    groups2.get(key).push(d);
+  }
+  const seriesOrder = /* @__PURE__ */ new Map();
+  for (const d of points) {
+    const key = seriesKey(d);
+    if (!seriesOrder.has(key)) seriesOrder.set(key, seriesOrder.size);
+  }
+  if (seriesOrder.size > 1) {
+    for (const group2 of groups2.values()) {
+      group2.sort((a, b) => seriesOrder.get(seriesKey(a)) - seriesOrder.get(seriesKey(b)));
+    }
+  }
+  const result = new Array(points.length);
+  const pointIndex = /* @__PURE__ */ new Map();
+  for (let i = 0; i < points.length; i++) {
+    pointIndex.set(points[i], i);
+  }
+  for (const [, group2] of groups2) {
+    let cumPos = 0;
+    let cumNeg = 0;
+    for (const d of group2) {
+      const val = Number(isHorizontal ? d.x : d.y);
+      const idx = pointIndex.get(d);
+      if (!Number.isFinite(val)) {
+        result[idx] = { ...d, _v0: cumPos, _v1: cumPos };
+        continue;
+      }
+      if (val >= 0) {
+        result[idx] = { ...d, _v0: cumPos, _v1: cumPos + val };
+        cumPos += val;
+      } else {
+        result[idx] = { ...d, _v0: cumNeg + val, _v1: cumNeg };
+        cumNeg += val;
+      }
+    }
+  }
+  return result;
+}
+function applyFill(points, orientation = "x") {
+  const stacked = applyStack(points, orientation);
+  const isHorizontal = orientation === "y";
+  const catKey = (d) => String(isHorizontal ? d.y : d.x);
+  const posTotal = /* @__PURE__ */ new Map();
+  const negTotal = /* @__PURE__ */ new Map();
+  for (const d of stacked) {
+    const key = catKey(d);
+    const v1 = d._v1;
+    const v0 = d._v0;
+    if (v1 > 0) posTotal.set(key, Math.max(posTotal.get(key) ?? 0, v1));
+    if (v0 < 0) negTotal.set(key, Math.min(negTotal.get(key) ?? 0, v0));
+  }
+  return stacked.map((d) => {
+    const key = catKey(d);
+    const v0 = d._v0;
+    const v1 = d._v1;
+    if (v1 > 0 && v0 >= 0) {
+      const total = posTotal.get(key) ?? 1;
+      if (total === 0) return d;
+      return { ...d, _v0: v0 / total, _v1: v1 / total };
+    } else if (v0 < 0 && v1 <= 0) {
+      const total = Math.abs(negTotal.get(key) ?? -1);
+      if (total === 0) return d;
+      return { ...d, _v0: v0 / total, _v1: v1 / total };
+    }
+    return d;
+  });
+}
+function computePosition(points, geom) {
+  const position = geom.position ?? "stack";
+  const orientation = ("orientation" in geom ? geom.orientation : void 0) ?? "x";
+  switch (position) {
+    case "dodge":
+      return applyDodge(points);
+    case "dodge2":
+      return applyDodge(points, true);
+    case "stack":
+      return applyStack(points, orientation);
+    case "fill":
+      return applyFill(points, orientation);
+    case "identity":
+    case "jitter":
+      return points.map((d) => ({ ...d }));
+  }
+}
+
+// src/facet-layout.ts
+function rowWeights(nRows, heights) {
+  const valid = (heights ?? []).filter((h) => Number.isFinite(h) && h > 0);
+  if (valid.length === 0) return Array.from({ length: nRows }, () => 1);
+  return Array.from({ length: nRows }, (_, r) => valid[r % valid.length]);
+}
+function layoutFacetGrid(input) {
+  const { nRows, nCols, present, innerWidth, innerHeight: innerHeight2, metrics } = input;
+  const showX = (r, c) => input.freeX || r === nRows - 1 || !present(r + 1, c);
+  const showY = (_r, c) => input.freeY || c === 0;
+  const xAxisRoom = (r) => input.freeX && r < nRows - 1 ? metrics.xAxis : 0;
+  const yAxisRoom = (c) => input.freeY && c > 0 ? input.yAxisWidth(c) : 0;
+  const stripAbove = (r) => input.stripAbove(r) ? metrics.strip : 0;
+  const extraLeft = Math.max(0, input.yAxisWidth(0) - input.reservedLeft);
+  const stripRight = input.stripRight ? metrics.strip : 0;
+  let interiorY = 0;
+  for (let c = 1; c < nCols; c++) interiorY += yAxisRoom(c);
+  const colGap = metrics.colSpacing ?? metrics.spacing;
+  const availW = innerWidth - extraLeft - interiorY - colGap * (nCols - 1) - stripRight;
+  const panelW = Math.max(1, availW / nCols);
+  let fixedH = metrics.spacing * (nRows - 1);
+  for (let r = 0; r < nRows; r++) fixedH += stripAbove(r) + xAxisRoom(r);
+  const availH = Math.max(nRows, innerHeight2 - fixedH);
+  const weights = rowWeights(nRows, input.heights);
+  const total = weights.reduce((a, w) => a + w, 0);
+  const rowH = weights.map((w) => Math.max(1, availH * w / total));
+  const colX = [];
+  let x2 = extraLeft;
+  for (let c = 0; c < nCols; c++) {
+    x2 += yAxisRoom(c);
+    colX.push(x2);
+    x2 += panelW + colGap;
+  }
+  const rowY = [];
+  let y2 = 0;
+  for (let r = 0; r < nRows; r++) {
+    y2 += stripAbove(r);
+    rowY.push(y2);
+    y2 += rowH[r] + xAxisRoom(r) + metrics.spacing;
+  }
+  const cells = [];
+  for (let r = 0; r < nRows; r++) {
+    for (let c = 0; c < nCols; c++) {
+      if (!present(r, c)) continue;
+      cells.push({
+        r,
+        c,
+        x: colX[c],
+        y: rowY[r],
+        width: panelW,
+        height: rowH[r],
+        showXAxis: showX(r, c),
+        showYAxis: showY(r, c)
+      });
+    }
+  }
+  return cells;
+}
+
 // src/tooltip.ts
 var Tooltip = class {
   constructor(container, config = {}, aes = {}) {
@@ -8476,10 +8698,12 @@ function renderPanel(ctx) {
     yAxis.ticks(theme2.nBreaks);
   }
   const xAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-x").attr("transform", `translate(0,${innerHeight2})`).call(xAxis);
+  if (ctx.showXAxis === false) xAxisGroup.remove();
   xAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
   xAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   xAxisGroup.select(".domain").style("display", "none");
   const yAxisGroup = panelG.append("g").attr("class", "ggpbi-axis-y").call(yAxis);
+  if (ctx.showYAxis === false) yAxisGroup.remove();
   yAxisGroup.selectAll("text").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor);
   yAxisGroup.selectAll(".tick line").style("stroke", theme2.axisTickColor);
   yAxisGroup.select(".domain").style("display", "none");
@@ -8817,13 +9041,16 @@ function specToR(spec, labels = {}) {
     if (line) lines.push(`  ${line}`);
   }
   if (spec.facet) {
-    const { wrap, row, col, ncol, nrow, freeX, freeY } = spec.facet;
+    const { wrap, row, col, ncol, nrow, freeX, freeY, heights } = spec.facet;
     const scalesArg = freeX && freeY ? ', scales = "free"' : freeX ? ', scales = "free_x"' : freeY ? ', scales = "free_y"' : "";
     if (wrap) {
       const extra = ncol ? `, ncol = ${ncol}` : nrow ? `, nrow = ${nrow}` : "";
       lines.push(`  facet_wrap(~ ${rName(wrap)}${extra}${scalesArg})`);
     } else if (row || col) {
       lines.push(`  facet_grid(${row ? rName(row) : "."} ~ ${col ? rName(col) : "."}${scalesArg})`);
+    }
+    if (heights && heights.length > 0 && (wrap || row || col)) {
+      lines.push(`  ggh4x::force_panelsizes(rows = c(${heights.join(", ")}))`);
     }
   }
   if (spec.highlight) {
@@ -37464,7 +37691,7 @@ var GEOM_OPTIONS = [
   "naRm"
 ];
 var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels"];
-var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY"];
+var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY", "heights"];
 var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize"];
 var THEME_PRESETS = ["grey", "minimal", "dark"];
 var options = (labels, type2) => labels.map((label) => ({ label, type: type2 }));
@@ -37557,6 +37784,7 @@ var R_FUNCTIONS = [
   "scale_y_continuous",
   "facet_wrap",
   "facet_grid",
+  "ggh4x::force_panelsizes",
   "gghighlight",
   "labs",
   "theme_ggpbi",
@@ -37600,7 +37828,8 @@ var R_NAMED_ARGS = [
   "limits",
   "labels",
   "subtitle",
-  "trans"
+  "trans",
+  "rows"
 ];
 var rApply = (name2) => /^[a-zA-Z.][\w.]*$/.test(name2) ? name2 : `\`${name2.replace(/`/g, "")}\``;
 function createGgplot2Completions(fields = []) {
@@ -38057,112 +38286,6 @@ async function copyText(container, text) {
   }
 }
 
-// src/position.ts
-function applyDodge(points, padded = false) {
-  const colorGroups = Array.from(
-    new Set(points.map((d) => String(d.color ?? "__none__")))
-  );
-  const nColors = colorGroups.length;
-  return points.map((d) => ({
-    ...d,
-    _dodgeIndex: colorGroups.indexOf(String(d.color ?? "__none__")),
-    _dodgeN: nColors,
-    _dodgePadded: padded
-  }));
-}
-function applyStack(points, orientation = "x") {
-  const isHorizontal = orientation === "y";
-  const catKey = (d) => String(isHorizontal ? d.y : d.x);
-  const seriesKey = (d) => `${String(d.group ?? "")}|${String(d.color ?? "")}`;
-  const groups2 = /* @__PURE__ */ new Map();
-  for (const d of points) {
-    const key = catKey(d);
-    if (!groups2.has(key)) groups2.set(key, []);
-    groups2.get(key).push(d);
-  }
-  const seriesOrder = /* @__PURE__ */ new Map();
-  for (const d of points) {
-    const key = seriesKey(d);
-    if (!seriesOrder.has(key)) seriesOrder.set(key, seriesOrder.size);
-  }
-  if (seriesOrder.size > 1) {
-    for (const group2 of groups2.values()) {
-      group2.sort((a, b) => seriesOrder.get(seriesKey(a)) - seriesOrder.get(seriesKey(b)));
-    }
-  }
-  const result = new Array(points.length);
-  const pointIndex = /* @__PURE__ */ new Map();
-  for (let i = 0; i < points.length; i++) {
-    pointIndex.set(points[i], i);
-  }
-  for (const [, group2] of groups2) {
-    let cumPos = 0;
-    let cumNeg = 0;
-    for (const d of group2) {
-      const val = Number(isHorizontal ? d.x : d.y);
-      const idx = pointIndex.get(d);
-      if (!Number.isFinite(val)) {
-        result[idx] = { ...d, _v0: cumPos, _v1: cumPos };
-        continue;
-      }
-      if (val >= 0) {
-        result[idx] = { ...d, _v0: cumPos, _v1: cumPos + val };
-        cumPos += val;
-      } else {
-        result[idx] = { ...d, _v0: cumNeg + val, _v1: cumNeg };
-        cumNeg += val;
-      }
-    }
-  }
-  return result;
-}
-function applyFill(points, orientation = "x") {
-  const stacked = applyStack(points, orientation);
-  const isHorizontal = orientation === "y";
-  const catKey = (d) => String(isHorizontal ? d.y : d.x);
-  const posTotal = /* @__PURE__ */ new Map();
-  const negTotal = /* @__PURE__ */ new Map();
-  for (const d of stacked) {
-    const key = catKey(d);
-    const v1 = d._v1;
-    const v0 = d._v0;
-    if (v1 > 0) posTotal.set(key, Math.max(posTotal.get(key) ?? 0, v1));
-    if (v0 < 0) negTotal.set(key, Math.min(negTotal.get(key) ?? 0, v0));
-  }
-  return stacked.map((d) => {
-    const key = catKey(d);
-    const v0 = d._v0;
-    const v1 = d._v1;
-    if (v1 > 0 && v0 >= 0) {
-      const total = posTotal.get(key) ?? 1;
-      if (total === 0) return d;
-      return { ...d, _v0: v0 / total, _v1: v1 / total };
-    } else if (v0 < 0 && v1 <= 0) {
-      const total = Math.abs(negTotal.get(key) ?? -1);
-      if (total === 0) return d;
-      return { ...d, _v0: v0 / total, _v1: v1 / total };
-    }
-    return d;
-  });
-}
-function computePosition(points, geom) {
-  const position = geom.position ?? "stack";
-  const orientation = ("orientation" in geom ? geom.orientation : void 0) ?? "x";
-  switch (position) {
-    case "dodge":
-      return applyDodge(points);
-    case "dodge2":
-      return applyDodge(points, true);
-    case "stack":
-      return applyStack(points, orientation);
-    case "fill":
-      return applyFill(points, orientation);
-    case "identity":
-    case "jitter":
-      return points.map((d) => ({ ...d }));
-  }
-}
-
 // src/describe.ts
 var GEOM_NOUN = {
   point: "Values",
@@ -38389,11 +38512,11 @@ function applyLayerFilter(data, geom, aes, scales) {
   }
   return data.filter((d) => keep.has(d));
 }
-function hasMultipleRowsPerGroup(data, aes, horizontal) {
+function hasMultipleRowsPerGroup(data, aes, horizontal, facetFields2 = []) {
   if (!data || data.length === 0) return false;
   const catField = horizontal ? aes.y : aes.x;
   if (!catField) return false;
-  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol].filter((f) => !!f);
+  const keyFields = [catField, aes.color, aes.group, aes.facetRow, aes.facetCol, ...facetFields2].filter((f) => !!f);
   const seen = /* @__PURE__ */ new Set();
   for (const d of data) {
     const key = keyFields.map((f) => String(d[f])).join("\0");
@@ -38402,16 +38525,29 @@ function hasMultipleRowsPerGroup(data, aes, horizontal) {
   }
   return false;
 }
-function resolveLayerStat(layer2, globalAes, data) {
+function facetFields(facet) {
+  if (!facet) return [];
+  if (facet.wrap) return [facet.wrap];
+  return [facet.row, facet.col].filter((f) => !!f);
+}
+function isMissingValue(v) {
+  return v == null || v === "" || typeof v === "number" && Number.isNaN(v);
+}
+function rowsWithValue(data, field) {
+  if (!data || !field) return data;
+  return data.filter((d) => !isMissingValue(d[field]));
+}
+function resolveLayerStat(layer2, globalAes, data, facet) {
   const explicit = layer2.stat ?? layer2.geom.stat;
   if (explicit) return explicit;
   const defaultStat = DEFAULT_GEOM_STAT[layer2.geom.type];
   if (!defaultStat) return "identity";
   if (defaultStat === "count") {
     const horizontal = "orientation" in layer2.geom && layer2.geom.orientation === "y";
-    const valueMapped = horizontal ? !!globalAes.x : !!globalAes.y;
-    if (valueMapped) {
-      return hasMultipleRowsPerGroup(data, globalAes, horizontal) ? "sum" : "identity";
+    const aes = mergeAes2(globalAes, layer2.aes ?? layer2.geom.aes);
+    const valueField = horizontal ? aes.x : aes.y;
+    if (valueField) {
+      return hasMultipleRowsPerGroup(rowsWithValue(data, valueField), aes, horizontal, facetFields(facet)) ? "sum" : "identity";
     }
   }
   if (defaultStat === "bin") return "bin";
@@ -38444,10 +38580,11 @@ function stripStatAes(layers, keys2) {
 }
 function computeStat(spec, data) {
   for (const layer2 of spec.layers) {
-    const statType = resolveLayerStat(layer2, spec.aes, data);
+    const statType = resolveLayerStat(layer2, spec.aes, data, spec.facet);
     if (statType === "identity" || statType === "boxplot" || statType === "smooth") continue;
     const statFn = stats[statType];
-    const result = statFn(data, spec.aes, layer2.geom);
+    const statAes = mergeAes2(spec.aes, layer2.aes ?? layer2.geom.aes);
+    const result = statType === "sum" || statType === "count" ? statPerPanel(data, spec.facet, (part) => statFn(part, statAes, layer2.geom)) : statFn(data, statAes, layer2.geom);
     if (data.length > 0 && result.data.length === 0) {
       throw new Error(`ggpbi: stat "${statType}" needs at least 2 values per group`);
     }
@@ -38459,6 +38596,26 @@ function computeStat(spec, data) {
     };
   }
   return { spec, data };
+}
+function statPerPanel(data, facet, run) {
+  const fields = facetFields(facet);
+  if (fields.length === 0) return run(data);
+  const parts = /* @__PURE__ */ new Map();
+  for (const d of data) {
+    const key = fields.map((f) => String(d[f])).join("\0");
+    const part = parts.get(key);
+    if (part) part.push(d);
+    else parts.set(key, [d]);
+  }
+  let aesOverrides;
+  const out = [];
+  for (const part of parts.values()) {
+    const result = run(part);
+    aesOverrides ??= result.aesOverrides;
+    const panel = Object.fromEntries(fields.map((f) => [f, part[0][f]]));
+    for (const row of result.data) out.push({ ...row, ...panel });
+  }
+  return { data: out, ...aesOverrides && { aesOverrides } };
 }
 function computeSizeScale(layerBindings, data, sizeField) {
   if (!sizeField) return layerBindings;
@@ -38622,6 +38779,47 @@ function createColorScale(data, aes, theme2) {
   const unique = Array.from(new Set(data.map((d) => d[aes.color])));
   return ordinal().domain(unique.map(String)).range(theme2.colorPalette);
 }
+function boundExtent(bindings, geoms, axis2, includeZeroBaseline = true) {
+  let lo = Infinity;
+  let hi = -Infinity;
+  const add = (v) => {
+    if (isMissingValue(v)) return;
+    const n = v instanceof Date ? v.getTime() : Number(v);
+    if (!Number.isFinite(n)) return;
+    if (n < lo) lo = n;
+    if (n > hi) hi = n;
+  };
+  const rangeKeys = axis2 === "y" ? ["y", "ymin", "ymax", "yend"] : ["x", "xmin", "xmax", "xend"];
+  bindings.forEach((points, li) => {
+    const geom = geoms[li];
+    const barLike = !!geom && (geom.type === "bar" || geom.type === "col" || geom.type === "histogram");
+    const horizontal = !!geom && "orientation" in geom && geom.orientation === "y";
+    const valueAxis = horizontal ? "x" : "y";
+    const onZero = !!geom && standsOnZero(geom, axis2);
+    let any = false;
+    for (const p of points) {
+      if (barLike && axis2 === valueAxis && (p._v0 !== void 0 || p._v1 !== void 0)) {
+        if (isMissingValue(p[axis2])) continue;
+        if (Number.isFinite(p._v0) && Number.isFinite(p._v1)) {
+          add(p._v0);
+          add(p._v1);
+          any = true;
+        }
+        continue;
+      }
+      for (const k of rangeKeys) add(p[k]);
+      if (!isMissingValue(p[axis2]) && Number.isFinite(Number(p[axis2]))) any = true;
+    }
+    if (onZero && includeZeroBaseline && any) add(0);
+  });
+  return Number.isFinite(lo) && Number.isFinite(hi) ? [lo, hi] : void 0;
+}
+function standsOnZero(geom, axis2) {
+  const barLike = geom.type === "bar" || geom.type === "col" || geom.type === "histogram";
+  const horizontal = "orientation" in geom && geom.orientation === "y";
+  if (barLike) return axis2 === (horizontal ? "x" : "y");
+  return geom.type === "area" && axis2 === "y";
+}
 function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2) {
   const xCfg = parseScaleConfig(spec.scales?.x);
   const yCfg = parseScaleConfig(spec.scales?.y);
@@ -38659,6 +38857,7 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
     let xMax = -Infinity;
     for (const field of [spec.aes.x, ...xRangeFields]) {
       for (const d of data) {
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < xMin) xMin = v;
@@ -38686,6 +38885,7 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
     let yMax = -Infinity;
     for (const field of allYFields) {
       for (const d of data) {
+        if (isMissingValue(d[field])) continue;
         const v = Number(d[field]);
         if (!isNaN(v)) {
           if (v < yMin) yMin = v;
@@ -38693,7 +38893,8 @@ function trainScales(spec, data, layerBindings, innerWidth, innerHeight2, theme2
         }
       }
     }
-    yScale = createScale(data, spec.aes.y, yType, [innerHeight2, 0]);
+    const scaleField = [spec.aes.y, ...allYFields].find((f) => data.some((d) => !isMissingValue(d[f]))) ?? spec.aes.y;
+    yScale = createScale(data, scaleField, yType, [innerHeight2, 0]);
     if (isFinite(yMin) && isFinite(yMax)) {
       yScale.domain([yMin, yMax]);
     }
@@ -38772,13 +38973,21 @@ function estimateYTickLabelWidth(spec, data, theme2) {
   } else if (yType === "time") {
     labels = ["MMMMMM"];
   } else {
+    const yFields = /* @__PURE__ */ new Set([yField]);
+    for (const layer2 of spec.layers) {
+      const layerY = (layer2.aes ?? layer2.geom.aes)?.y;
+      if (layerY) yFields.add(layerY);
+    }
     let lo = Infinity;
     let hi = -Infinity;
-    for (const d of data) {
-      const v = Number(d[yField]);
-      if (Number.isFinite(v)) {
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
+    for (const field of yFields) {
+      for (const d of data) {
+        if (isMissingValue(d[field])) continue;
+        const v = Number(d[field]);
+        if (Number.isFinite(v)) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
       }
     }
     if (!isFinite(lo) || !isFinite(hi)) return 0;
@@ -38827,7 +39036,7 @@ function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   if (spec.warnAggregated) {
     const descriptions2 = preStatSpec.layers.map((layer2) => ({
       geom: layer2.geom.type,
-      stat: resolveLayerStat(layer2, preStatSpec.aes, rawData)
+      stat: resolveLayerStat(layer2, preStatSpec.aes, rawData, preStatSpec.facet)
     }));
     if (shouldWarnAggregated(descriptions2, preStatSpec.aes, rawData)) {
       notes.push(AGGREGATION_NOTE);
@@ -38841,7 +39050,7 @@ function resolveSubtitle(spec, inputSpec, preStatSpec, rawData) {
   const autoGeom = inputSpec.layers.length === 0;
   const descriptions = preStatSpec.layers.map((layer2) => ({
     geom: layer2.geom.type,
-    stat: resolveLayerStat(layer2, preStatSpec.aes, rawData),
+    stat: resolveLayerStat(layer2, preStatSpec.aes, rawData, preStatSpec.facet),
     autoGeom
   }));
   if (mode === "auto" && !hasHiddenTransform(descriptions)) return withNote(void 0);
@@ -39104,77 +39313,166 @@ function renderFaceted(g, svg, built) {
     nRows = Math.max(1, rowLevels.length);
     nCols = Math.max(1, colLevels.length);
   }
-  const panelOuterWidth = innerWidth / nCols;
-  const panelOuterHeight = innerHeight2 / nRows;
-  const panelMargin = { top: 22, right: 12, bottom: 34, left: 44 };
   const xCfg = parseScaleConfig(spec.scales?.x);
   const yCfg = parseScaleConfig(spec.scales?.y);
   const { xType, yType } = scales;
+  const geoms = spec.layers.map((l) => l.geom);
   const xBandOpts = xType === "ordinal" || xType === "category" ? { paddingInner: xCfg.paddingInner, paddingOuter: xCfg.paddingOuter } : void 0;
+  const cells = [];
   for (let r = 0; r < nRows; r++) {
     for (let c = 0; c < nCols; c++) {
       const wrapVal = wrapField ? wrapLevels[r * nCols + c] : void 0;
       if (wrapField && wrapVal === void 0) continue;
       const rowVal = rowLevels[r];
       const colVal = colLevels[c];
-      const dataCell = data.filter((d) => {
+      const rows = data.filter((d) => {
         if (wrapField) return String(d[wrapField]) === wrapVal;
         const okRow = !rowField || String(d[rowField]) === rowVal;
         const okCol = !colField || String(d[colField]) === colVal;
         return okRow && okCol;
       });
-      const facetG = g.append("g").attr("class", "ggpbi-facet").attr("transform", `translate(${c * panelOuterWidth},${r * panelOuterHeight})`);
-      if (wrapField) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-wrap").attr("x", panelOuterWidth / 2).attr("y", 14).attr("text-anchor", "middle").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(wrapVal);
-      }
-      if (!wrapField && colField && r === 0) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-col").attr("x", panelOuterWidth / 2).attr("y", 14).attr("text-anchor", "middle").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(colVal);
-      }
-      if (!wrapField && rowField && c === 0) {
-        facetG.append("text").attr("class", "ggpbi-facet-strip-row").attr("x", 4).attr("y", 14).attr("text-anchor", "start").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(rowVal);
-      }
-      const panelInnerWidth = panelOuterWidth - panelMargin.left - panelMargin.right;
-      const panelInnerHeight = panelOuterHeight - panelMargin.top - panelMargin.bottom;
-      const panelG = facetG.append("g").attr("transform", `translate(${panelMargin.left},${panelMargin.top})`);
-      const xScale = facet.freeX ? createScale(dataCell, spec.aes.x, xType, [0, panelInnerWidth], xBandOpts) : createScale(data, spec.aes.x, xType, [0, panelInnerWidth], xBandOpts);
-      applyExpandAndLimits(xScale, xType, xCfg, built.geomPadPx.x);
-      const yScale = facet.freeY ? createScale(dataCell, spec.aes.y, yType, [panelInnerHeight, 0]) : createScale(data, spec.aes.y, yType, [panelInnerHeight, 0]);
-      applyExpandAndLimits(yScale, yType, yCfg, built.geomPadPx.y);
-      let cellLayerData = spec.layers.map((layer2) => {
-        if (dataCell.length === 0) return [];
-        const layerAes = layer2.aes ?? layer2.geom.aes;
-        const mergedAes = mergeAes2(spec.aes, layerAes);
-        const cellRows = applyLayerFilter(dataCell, layer2.geom, mergedAes, spec.scales);
-        const layerBoundCell = bindData(cellRows, mergedAes);
+      let layerData = spec.layers.map((layer2) => {
+        if (rows.length === 0) return [];
+        const mergedAes = mergeAes2(spec.aes, layer2.aes ?? layer2.geom.aes);
+        const cellRows = applyLayerFilter(rows, layer2.geom, mergedAes, spec.scales);
+        const bound = bindData(cellRows, mergedAes);
         if (spec.aes.size) {
           const facetSizeScale = createSizeScale(data, spec.aes.size);
-          for (const bp of layerBoundCell) {
+          for (const bp of bound) {
             if (bp.size != null) bp.size = facetSizeScale(Number(bp.size));
           }
         }
-        return layerBoundCell;
+        const t2 = layer2.geom.type;
+        return t2 === "bar" || t2 === "col" || t2 === "histogram" ? computePosition(bound, layer2.geom) : bound;
       });
-      cellLayerData = applyHighlightToBindings(cellLayerData, spec);
-      renderPanel({
-        panelG,
-        svg,
-        innerWidth: panelInnerWidth,
-        innerHeight: panelInnerHeight,
-        xScale,
-        yScale,
-        theme: theme2,
-        colorScale: scales.color,
-        colorScaleBase: scales.colorBase,
-        geoms: spec.layers.map((l) => l.geom),
-        layerData: cellLayerData,
-        clipSuffix: `facet-${r}-${c}`,
-        xLabelFormat: xCfg.labels,
-        yLabelFormat: yCfg.labels,
-        format: spec.format,
-        xDateFormat: xCfg.dateLabels,
-        yDateFormat: yCfg.dateLabels
-      });
+      layerData = applyHighlightToBindings(layerData, spec);
+      cells.push({ r, c, label: { wrap: wrapVal, row: rowVal, col: colVal }, rows, layerData });
     }
+  }
+  const isContinuous = (t2) => t2 === "linear" || t2 === "log" || t2 === "sqrt";
+  const freshContinuous = (t2) => t2 === "log" ? log() : t2 === "sqrt" ? sqrt() : linear2();
+  const trainValueScale = (axis2, type2, scope, range2, cfg, padPx) => {
+    const bindings = scope.flatMap((cell) => cell.layerData);
+    const layerGeoms = scope.flatMap(() => geoms);
+    const ext = boundExtent(bindings, layerGeoms, axis2, false) ?? boundExtent(cells.flatMap((cell) => cell.layerData), cells.flatMap(() => geoms), axis2, false) ?? [0, 1];
+    const domain = ext[0] === ext[1] ? [ext[0] - (Math.abs(ext[0]) || 1) * 0.5, ext[1] + (Math.abs(ext[1]) || 1) * 0.5] : ext;
+    const scale = freshContinuous(type2).domain(domain).range(range2);
+    applyExpandAndLimits(scale, type2, cfg, padPx);
+    const onZero = bindings.some((pts, i) => standsOnZero(layerGeoms[i], axis2) && pts.some((p) => !isMissingValue(p[axis2]) && Number.isFinite(Number(p[axis2]))));
+    if (onZero && type2 !== "log") {
+      const [d0, d1] = scale.domain();
+      scale.domain([
+        cfg.min !== void 0 ? d0 : ext[0] >= 0 ? 0 : Math.min(d0, 0),
+        cfg.max !== void 0 ? d1 : ext[1] <= 0 ? 0 : Math.max(d1, 0)
+      ]);
+    }
+    return scale;
+  };
+  const hasHorizontalBars = geoms.some((gm) => standsOnZero(gm, "x"));
+  const makeXScale = (cell, range2) => {
+    if (hasHorizontalBars && isContinuous(xType)) {
+      return trainValueScale("x", xType, facet.freeX ? [cell] : cells, range2, xCfg, built.geomPadPx.x);
+    }
+    const scale = createScale(facet.freeX ? cell.rows : data, spec.aes.x, xType, range2, xBandOpts);
+    applyExpandAndLimits(scale, xType, xCfg, built.geomPadPx.x);
+    return scale;
+  };
+  const makeYScale = (cell, range2) => {
+    if (isContinuous(yType)) {
+      return trainValueScale("y", yType, facet.freeY ? [cell] : cells, range2, yCfg, built.geomPadPx.y);
+    }
+    const scale = createScale(facet.freeY ? cell.rows : data, spec.aes.y, yType, range2);
+    applyExpandAndLimits(scale, yType, yCfg, built.geomPadPx.y);
+    return scale;
+  };
+  const yLabelWidth = (cell) => {
+    const scale = makeYScale(cell, [100, 0]);
+    let labels;
+    if (typeof scale.bandwidth === "function") {
+      labels = scale.domain().map(String);
+    } else if (yType === "time") {
+      labels = ["MMMMMM"];
+    } else {
+      const [lo, hi] = scale.domain().map(Number);
+      const ticks2 = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? extendedBreaks(lo, hi, theme2.nBreaks).filter((t2) => t2 >= lo && t2 <= hi) : [];
+      labels = formatBreaksAs(ticks2, yCfg.labels, spec.format);
+    }
+    return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme2.axisTextSize)), 0);
+  };
+  const colLabelWidth = Array.from({ length: nCols }, () => 0);
+  for (const cell of cells) {
+    if (cell.c === 0 || facet.freeY) {
+      colLabelWidth[cell.c] = Math.max(colLabelWidth[cell.c], yLabelWidth(cell));
+    }
+  }
+  const tickRoom = theme2.tickLength + AXIS_TICK_PADDING;
+  const reservedLeft = Math.max(
+    0,
+    built.layout.margin.left - (theme2.halfLine * 2 + theme2.axisTitleSize + theme2.axisTitleMargin)
+  );
+  const present = new Set(cells.map((cell) => `${cell.r},${cell.c}`));
+  const stripH = Math.round(theme2.axisTextSize + 1.6 * theme2.halfLine);
+  const grid = layoutFacetGrid({
+    nRows,
+    nCols,
+    present: (r, c) => present.has(`${r},${c}`),
+    innerWidth,
+    innerHeight: innerHeight2,
+    freeX: !!facet.freeX,
+    freeY: !!facet.freeY,
+    stripAbove: (r) => !!wrapField || !!colField && r === 0,
+    stripRight: !wrapField && !!rowField,
+    heights: facet.heights,
+    yAxisWidth: (c) => colLabelWidth[c] + tickRoom,
+    reservedLeft,
+    metrics: {
+      strip: stripH,
+      xAxis: Math.round(tickRoom + theme2.axisTextSize * 1.2),
+      spacing: theme2.halfLine,
+      // Free x scales label both edges of every panel: leave room so the
+      // last tick of one panel and the first of the next do not collide.
+      ...facet.freeX && { colSpacing: theme2.halfLine + theme2.axisTextSize * 2 }
+    }
+  });
+  const cellAt = new Map(cells.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  const stripText = (parent, cls, x2, y2, text, rotate = false) => {
+    const t2 = parent.append("text").attr("class", cls).attr("x", x2).attr("y", y2).attr("text-anchor", "middle").attr("dominant-baseline", "central").style("font-size", `${theme2.axisTextSize}px`).style("fill", theme2.axisTextColor).text(text);
+    if (rotate) t2.attr("transform", `rotate(90,${x2},${y2})`);
+  };
+  for (const pos of grid) {
+    const cell = cellAt.get(`${pos.r},${pos.c}`);
+    const facetG = g.append("g").attr("class", "ggpbi-facet").attr("transform", `translate(${pos.x},${pos.y})`);
+    if (wrapField) {
+      stripText(facetG, "ggpbi-facet-strip-wrap", pos.width / 2, -stripH / 2, cell.label.wrap);
+    }
+    if (!wrapField && colField && pos.r === 0) {
+      stripText(facetG, "ggpbi-facet-strip-col", pos.width / 2, -stripH / 2, cell.label.col);
+    }
+    if (!wrapField && rowField && pos.c === nCols - 1) {
+      stripText(facetG, "ggpbi-facet-strip-row", pos.width + stripH / 2, pos.height / 2, cell.label.row, true);
+    }
+    const panelG = facetG.append("g").attr("class", "ggpbi-facet-panel");
+    renderPanel({
+      panelG,
+      svg,
+      innerWidth: pos.width,
+      innerHeight: pos.height,
+      xScale: makeXScale(cell, [0, pos.width]),
+      yScale: makeYScale(cell, [pos.height, 0]),
+      theme: theme2,
+      colorScale: scales.color,
+      colorScaleBase: scales.colorBase,
+      geoms,
+      layerData: cell.layerData,
+      clipSuffix: `facet-${pos.r}-${pos.c}`,
+      xLabelFormat: xCfg.labels,
+      yLabelFormat: yCfg.labels,
+      format: spec.format,
+      xDateFormat: xCfg.dateLabels,
+      yDateFormat: yCfg.dateLabels,
+      showXAxis: pos.showXAxis,
+      showYAxis: pos.showYAxis
+    });
   }
 }
 function renderLabelsAndLegend(g, built) {
@@ -39394,10 +39692,17 @@ var DEFAULT_ROLE_MAPPING = {
   tooltip: "tooltip"
 };
 function resolveColor(val, palette = []) {
-  if (!val) return void 0;
-  if (typeof val === "string") return val;
-  if (val?.solid?.color) return val.solid.color;
-  const tdc = val?.expr?.ThemeDataColor ?? val?.ThemeDataColor;
+  if (val == null) return void 0;
+  if (typeof val === "string") {
+    const s = val.trim().replace(/^'(.*)'$/s, "$1").trim();
+    return s === "" ? void 0 : s;
+  }
+  if (typeof val !== "object") return void 0;
+  if ("solid" in val) return resolveColor(val.solid?.color, palette);
+  if ("value" in val) return resolveColor(val.value, palette);
+  const literal3 = val.expr?.Literal?.Value;
+  if (typeof literal3 === "string") return resolveColor(literal3, palette);
+  const tdc = val.expr?.ThemeDataColor ?? val.ThemeDataColor;
   if (tdc && palette.length > 0) {
     const base2 = palette[tdc.ColorId % palette.length];
     return tdc.Percent ? adjustBrightness(base2, tdc.Percent) : base2;
@@ -39561,7 +39866,7 @@ function tokenize2(code) {
       continue;
     }
     if (/[a-zA-Z.]/.test(ch)) {
-      const m = /[a-zA-Z.][\w.]*/y;
+      const m = /[a-zA-Z.][\w.]*(?:::[a-zA-Z.][\w.]*)?/y;
       m.lastIndex = i;
       const hit = m.exec(code);
       toks.push({ kind: "ident", text: hit[0], line });
@@ -39800,6 +40105,18 @@ function mapScale(call, patch) {
   }
   patch.scales = { ...patch.scales ?? {}, [axis2]: cfg };
 }
+function mapPanelSizes(call, patch) {
+  for (const arg of call.args) {
+    if (arg.name !== "rows") {
+      throw new ParseError2(`force_panelsizes(${arg.name ?? "\u2026"} = \u2026) is not supported \u2014 only rows = c(\u2026)`, arg.line);
+    }
+    const v = Array.isArray(arg.value) ? arg.value : [arg.value];
+    if (v.length === 0 || !v.every((h) => typeof h === "number" && h > 0)) {
+      throw new ParseError2("rows needs positive numbers, e.g. c(4, 1)", arg.line);
+    }
+    patch.facet = { ...patch.facet ?? {}, heights: v };
+  }
+}
 function mapFacet(call, patch) {
   const facet = {};
   for (const arg of call.args) {
@@ -39833,7 +40150,8 @@ function mapFacet(call, patch) {
     }
     throw new ParseError2(`${call.fn}(${arg.name} = \u2026) is not supported`, arg.line);
   }
-  patch.facet = facet;
+  const heights = patch.facet?.heights;
+  patch.facet = heights ? { ...facet, heights } : facet;
 }
 function parseR(code) {
   try {
@@ -39863,6 +40181,10 @@ function parseR(code) {
       }
       if (call.fn === "facet_wrap" || call.fn === "facet_grid") {
         mapFacet(call, patch);
+        continue;
+      }
+      if (call.fn === "ggh4x::force_panelsizes" || call.fn === "force_panelsizes") {
+        mapPanelSizes(call, patch);
         continue;
       }
       if (call.fn === "gghighlight") {
@@ -40075,14 +40397,21 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     }
   }
   {
-    const FACET_PROP = { ncol: "columns", freeX: "freeX", freeY: "freeY" };
+    const FACET_PROP = {
+      ncol: "columns",
+      freeX: "freeX",
+      freeY: "freeY",
+      heights: "heights"
+    };
     const properties = {};
     if (patch.facet) {
       for (const [key, value] of Object.entries(patch.facet)) {
         if (key === "ncol" && typeof value === "number") properties.columns = value;
         else if (key === "freeX" && typeof value === "boolean") properties.freeX = value;
         else if (key === "freeY" && typeof value === "boolean") properties.freeY = value;
-        else if (key === "wrap" || key === "row" || key === "col") {
+        else if (key === "heights" && Array.isArray(value) && value.length > 0 && value.every((h) => typeof h === "number" && h > 0)) {
+          properties.heights = value.join(",");
+        } else if (key === "wrap" || key === "row" || key === "col") {
           const liveFacet2 = live.facet;
           if (liveFacet2?.[key] !== value) residual = true;
         } else residual = true;
@@ -40094,7 +40423,8 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     for (const [key, prop] of Object.entries(FACET_PROP)) {
       if (liveFacet[key] === void 0) continue;
       if (patch.facet && key in patch.facet) continue;
-      revert(properties, "facet", prop);
+      if (prop === "heights") properties.heights = "";
+      else revert(properties, "facet", prop);
     }
     add("facet", properties);
   }

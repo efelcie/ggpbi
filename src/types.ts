@@ -600,6 +600,14 @@ export interface FacetConfig {
    * Default: false (shared scales)
    */
   freeX?: boolean;
+
+  /**
+   * Relative heights of the panel rows, e.g. `[4, 1]`: the first row
+   * four times as tall as the second. Recycled when shorter than the
+   * number of rows, like patchwork's `heights`; the R equivalent is
+   * `ggh4x::force_panelsizes(rows = c(4, 1))`. Default: equal rows.
+   */
+  heights?: number[];
 }
 
 export interface SelectionConfig {

@@ -42,7 +42,9 @@ export function breakDecimals(breaks: number[]): number {
   }
   if (smallestDiff < Math.sqrt(Number.EPSILON)) return 1;
 
-  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff)) - 1);
+  // The epsilon absorbs binary noise: 13.0 - 12.9 is 0.0999…96, whose
+  // log10 floors to -2 and would buy a spurious extra decimal.
+  let p = Math.pow(10, Math.floor(Math.log10(smallestDiff) + 1e-9) - 1);
   if (unique.every(v => Math.round(v / p) % 10 === 0)) p *= 10;
   p = Math.min(p, 1);
 
@@ -93,16 +95,90 @@ export function formatThousands(breaks: number[], opts: FormatOptions = {}): str
 }
 
 /**
- * Short scale: 1.2M, 450K. `Intl`'s compact notation carries the locale's
- * own suffixes, so German gets "1,2 Mio." rather than a translated "M".
+ * The power of ten `Intl`'s compact notation divides `v` by in `locale`:
+ * 1e6 for "7.5M", 1e3 for "450K", 1 for "0" or "120". German has no short
+ * form for thousands and Indian English counts in lakh (1e5) — asking
+ * `Intl` keeps those rules.
+ */
+function compactScale(v: number, probe: Intl.NumberFormat): number {
+  if (v === 0 || !Number.isFinite(v)) return 1;
+  let digits = '';
+  for (const part of probe.formatToParts(v)) {
+    if (part.type === 'integer') digits += part.value;
+    else if (part.type === 'decimal') digits += '.';
+    else if (part.type === 'fraction') digits += part.value;
+  }
+  const shown = Math.abs(Number(digits));
+  if (!Number.isFinite(shown) || shown === 0) return 1;
+  return Math.pow(10, Math.round(Math.log10(Math.abs(v) / shown)));
+}
+
+/**
+ * Short scale: 1.2M, 450K — R's
+ * `scales::label_number(scale_cut = cut_short_scale())`, with the locale's
+ * own suffixes ("1,2 Mio." in German) from `Intl`'s compact notation.
+ *
+ * Each value gets its own unit, and the decimals come from the breaks
+ * like `scales::precision()`: computed per unit, so every label of the
+ * same unit carries the same decimals — "7.0M" next to "7.5M", and
+ * "1.29M … 1.33M" on a narrow range instead of five times "1.3M". Exact
+ * zeros are not scaled and share the group of the unscaled values, as in
+ * scales' `scale_cut()`.
  */
 export function formatCompact(breaks: number[], opts: FormatOptions = {}): string[] {
-  const nf = intl(opts.locale, {
-    notation: 'compact',
-    compactDisplay: 'short',
-    maximumFractionDigits: 1,
+  let probe: Intl.NumberFormat;
+  try {
+    // Latin digits so the probe can be parsed back; the unit choice is the same.
+    probe = new Intl.NumberFormat(opts.locale, {
+      notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 20, numberingSystem: 'latn',
+    });
+  } catch {
+    probe = new Intl.NumberFormat(undefined, {
+      notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 20, numberingSystem: 'latn',
+    });
+  }
+  const scales = breaks.map(v => compactScale(v, probe));
+
+  // Decimals per unit group, like scales' stats::ave(x * scale, scale, FUN = precision).
+  const groups = new Map<number, number[]>();
+  breaks.forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
+    const scaled = v / scales[i];
+    const group = groups.get(scales[i]);
+    if (group) group.push(scaled);
+    else groups.set(scales[i], [scaled]);
   });
-  return breaks.map(v => nf.format(v));
+  // One deliberate departure from scales: a label never misstates its
+  // break. scales gives a lone value in its unit no decimals, so breaks
+  // 0 and 2.5M (a flat facet panel) read "0" and "2M"; here the group keeps
+  // the decimals its values need (up to three).
+  const exactDecimals = (v: number): number => {
+    for (let d = 0; d < 3; d++) {
+      const f = Math.pow(10, d);
+      if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
+    }
+    return 3;
+  };
+  const decimalsOf = new Map<number, number>();
+  for (const [scale, values] of groups) {
+    decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
+  }
+
+  const formatters = new Map<number, Intl.NumberFormat>();
+  const formatterFor = (decimals: number): Intl.NumberFormat => {
+    let nf = formatters.get(decimals);
+    if (!nf) {
+      nf = intl(opts.locale, {
+        notation: 'compact',
+        compactDisplay: 'short',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+      formatters.set(decimals, nf);
+    }
+    return nf;
+  };
+  return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
 }
 
 /** Currency with the locale's own symbol placement and spacing. */

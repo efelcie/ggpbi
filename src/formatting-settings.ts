@@ -538,7 +538,9 @@ class ThemeCard extends formattingSettings.SimpleCard {
     value: 11,
     options: {
       minValue: { value: 6, type: 0 as const },
-      maxValue: { value: 24, type: 1 as const },
+      // 72, not 24: pages laid out at 3× device pixels (mobile layouts)
+      // need a base size around 40 to read like 13 px.
+      maxValue: { value: 72, type: 1 as const },
     },
   });
 
@@ -1097,9 +1099,17 @@ class FacetCard extends formattingSettings.SimpleCard {
     value: false,
   });
 
+  /** Relative row heights as text ("4,1"), like patchwork's heights. */
+  heights = new formattingSettings.TextInput({
+    name: 'heights',
+    displayName: 'Row heights',
+    value: '',
+    placeholder: 'e.g. 4,1',
+  });
+
   name = 'facet';
   displayName = 'Facets (Small Multiples)';
-  slices = [this.columns, this.freeX, this.freeY];
+  slices = [this.columns, this.freeX, this.freeY, this.heights];
 }
 
 export class GgpbiFormattingSettings extends formattingSettings.Model {

@@ -145,6 +145,13 @@ export interface PanelInput {
   xDateFormat?: DateFormat;
   /** Date granularity for a time y axis. */
   yDateFormat?: DateFormat;
+  /**
+   * Draw the x axis (ticks and labels). Facets draw it only on the outer
+   * panels unless the x scale is free, like ggplot2. Default true.
+   */
+  showXAxis?: boolean;
+  /** Draw the y axis. Default true. */
+  showYAxis?: boolean;
 }
 
 /**
@@ -244,10 +251,13 @@ export function renderPanel(ctx: PanelInput): void {
     yAxis.ticks(theme.nBreaks);
   }
 
+  // A hidden axis still contributes its breaks to the grid above; only
+  // the ticks and labels stay off (facet panels that share the axis).
   const xAxisGroup = panelG.append('g')
     .attr('class', 'ggpbi-axis-x')
     .attr('transform', `translate(0,${innerHeight})`)
     .call(xAxis);
+  if (ctx.showXAxis === false) xAxisGroup.remove();
 
   xAxisGroup.selectAll('text')
     .style('font-size', `${theme.axisTextSize}px`)
@@ -259,6 +269,7 @@ export function renderPanel(ctx: PanelInput): void {
   const yAxisGroup = panelG.append('g')
     .attr('class', 'ggpbi-axis-y')
     .call(yAxis);
+  if (ctx.showYAxis === false) yAxisGroup.remove();
 
   yAxisGroup.selectAll('text')
     .style('font-size', `${theme.axisTextSize}px`)
