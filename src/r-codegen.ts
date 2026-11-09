@@ -84,6 +84,7 @@ function geomArgs(geom: GeomConfig): string {
 export const R_SCALE_ARG: Record<string, string> = {
   dateBreaks: 'date_breaks',
   labelUnit: 'label_unit',
+  unitSuffix: 'unit_suffix',
   labelColor: 'label_colour',
 };
 

@@ -427,6 +427,7 @@ Up to **3 layers** can be composed. `layer1` is enabled by default.
 | `labelFormat` | enum | `auto` | `auto`, `thousands`, `compact`, `currency`, `percent` | Number format for the tick labels. `auto` is ggplot2’s plain look (no group separators), `thousands` groups digits. Separators, symbols and compact suffixes follow the report locale — `1200000` renders as `1.2M` (en) or `1,2 Mio.` (de). Decimals come from the breaks (`scales::precision()`), the same for every label of a unit: `7.0M`, `7.5M` |
 | `dateFormat` | enum | `auto` | `auto`, `year`, `monthYear`, `monthDay`, `date`, `dateTime` | Granularity of a time axis. `auto` follows the tick spacing; month names always come from the report locale |
 | `labelUnit` | enum | `none` | `none`, `thousands`, `millions`, `billions` | One fixed display unit for every label, like Power BI's display units: `0M`, `500M`, `1,500M` (R `label_number(scale = 1e-6, suffix = "M")`). Applies to `auto` and `thousands` (which groups digits); `compact` picks its own units |
+| `unitSuffix` | enum | `short` | `short`, `shortSpace`, `locale` | How `compact` and `labelUnit` name the unit (end labels follow): `short` = K, M, B, T as `scales::cut_short_scale()` (`7,6M` in German), `shortSpace` = with a space (`7,6 M`, like a Power BI format string `#,0,,.0 M`), `locale` = the report language's word (`7,6 Mio.`). Decimal and group marks always follow the locale |
 | `dateBreaks` | text | `""` | e.g. `6 months`, `1 year`, `3 months`, `2 weeks` | Fixed spacing of a time axis's labels, ggplot2 `date_breaks`; empty = automatic |
 | `labelColor` | color | `""` | any colour | Tick label colour (ggplot2 `axis.text = element_text(colour =)`); empty = theme |
 | `position` | enum | `left` | `left`, `right` | **scaleY only.** Side of the y axis, ggplot2 `position = "right"` |
@@ -2039,6 +2040,7 @@ The simplest valid ggpbi visual — only required fields, everything else auto:
 | `facet.rowAxes` | — (ggpbi) | Axes per row; R code view: `facet_wrap(row_axes = c("xy", "none"))` |
 | `scaleY.position` | `scale_y_continuous(position=)` | `"right"` |
 | `scaleX.labelUnit` / `scaleY.labelUnit` | `label_number(scale=, suffix=)` | Power BI display units |
+| `scaleX.unitSuffix` / `scaleY.unitSuffix` | `cut_short_scale()` letters; R code view: `unit_suffix =` | K/M/B/T, with space, or the language's word |
 | `scaleX.dateBreaks` | `scale_x_date(date_breaks=)` | Label spacing on a time axis |
 | `scaleX.labelColor` / `scaleY.labelColor` | `theme(axis.text.x/y = element_text(colour=))` | Tick label colour |
 | `theme.gridX` / `theme.gridY` / `theme.gridMinor` | `panel.grid.major.x/y`, `panel.grid.minor` | Grid switches |

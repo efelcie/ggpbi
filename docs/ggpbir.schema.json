@@ -4299,6 +4299,41 @@
                     }
                   }
                 },
+                "unitSuffix": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'short'",
+                                "'shortSpace'",
+                                "'locale'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
                 "dateFormat": {
                   "type": "object",
                   "additionalProperties": false,
@@ -4667,6 +4702,41 @@
                                 "'thousands'",
                                 "'millions'",
                                 "'billions'"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "unitSuffix": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "expr"
+                  ],
+                  "properties": {
+                    "expr": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "Literal"
+                      ],
+                      "properties": {
+                        "Literal": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "Value"
+                          ],
+                          "properties": {
+                            "Value": {
+                              "type": "string",
+                              "enum": [
+                                "'short'",
+                                "'shortSpace'",
+                                "'locale'"
                               ]
                             }
                           }

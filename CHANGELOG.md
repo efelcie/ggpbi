@@ -1,5 +1,21 @@
 # ggpbi Development Log
 
+## Unreleased
+
+- `compact` labels and display units name their unit with ggplot2's
+  letters K, M, B, T (`scales::cut_short_scale()`) by default, whatever the
+  report language — "7,6M" on a German phone instead of "7,6 Mio.". New
+  axis option **Unit suffix** (`unitSuffix`): `short` (default),
+  `shortSpace` ("7,6 M", like a Power BI format string `#,0,,.0 M`) or
+  `locale` (the language's own word, the 0.6.0 behaviour). Decimal and
+  group marks still follow the locale.
+- End labels show the last value one digit finer than the axis: "7.6M" on
+  a whole-million axis instead of "8M", "96.5%" instead of "97%".
+- End labels keep off the lines: each takes the first spot around its
+  point that no line and no other label runs through — beside a steep drop,
+  below a crossing line — and slides left along its line when the end is
+  crowded.
+
 ## 2026-11-08 - v0.6.0
 
 ### Layers, facets and colours

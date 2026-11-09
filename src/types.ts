@@ -95,9 +95,17 @@ export interface AxisScaleConfig {
    * A fixed display unit for every label — Power BI's "display units",
    * R's `label_number(scale = 1e-6, suffix = "M")`: 0, 500, 1,000 million
    * read "0M", "500M", "1,000M". Applies to the `auto` and `thousands`
-   * formats; the suffix follows the locale.
+   * formats.
    */
   labelUnit?: 'none' | 'thousands' | 'millions' | 'billions';
+  /**
+   * How `compact` labels and display units name the unit. 'short'
+   * (default): K, M, B, T as `scales::cut_short_scale()` writes them —
+   * "7.6M", "7,6M" in German. 'shortSpace': with a space, "7,6 M", like
+   * a Power BI format string `#,0,,.0 M`. 'locale': the report language's
+   * own word, "7,6 Mio.". Decimal and group marks always follow the locale.
+   */
+  unitSuffix?: 'short' | 'shortSpace' | 'locale';
   /** Tick label colour (ggplot2 `axis.text.x/y = element_text(colour =)`). */
   labelColor?: string;
   /**

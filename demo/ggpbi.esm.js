@@ -4931,6 +4931,7 @@ function compactScale(v, probe) {
   return Math.pow(10, Math.round(Math.log10(Math.abs(v) / shown)));
 }
 function formatCompact(breaks, opts = {}) {
+  if ((opts.unitSuffix ?? "short") !== "locale") return formatShortScale(breaks, opts);
   let probe;
   try {
     probe = new Intl.NumberFormat(opts.locale, {
@@ -4956,13 +4957,6 @@ function formatCompact(breaks, opts = {}) {
     if (group2) group2.push(scaled);
     else groups2.set(scales[i], [scaled]);
   });
-  const exactDecimals = (v) => {
-    for (let d = 0; d < 3; d++) {
-      const f = Math.pow(10, d);
-      if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
-    }
-    return 3;
-  };
   const decimalsOf = /* @__PURE__ */ new Map();
   for (const [scale, values] of groups2) {
     decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
@@ -4982,6 +4976,42 @@ function formatCompact(breaks, opts = {}) {
     return nf;
   };
   return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
+}
+function exactDecimals(v) {
+  for (let d = 0; d < 3; d++) {
+    const f = Math.pow(10, d);
+    if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
+  }
+  return 3;
+}
+var SHORT_SCALE = [
+  [1e12, "T"],
+  [1e9, "B"],
+  [1e6, "M"],
+  [1e3, "K"]
+];
+function formatShortScale(breaks, opts) {
+  const cut = (v) => SHORT_SCALE.find(([c]) => Math.abs(v) >= c) ?? [1, ""];
+  const cuts = breaks.map((v) => Number.isFinite(v) && v !== 0 ? cut(v) : [1, ""]);
+  const groups2 = /* @__PURE__ */ new Map();
+  breaks.forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
+    const [scale] = cuts[i];
+    const group2 = groups2.get(scale);
+    if (group2) group2.push(v / scale);
+    else groups2.set(scale, [v / scale]);
+  });
+  const decimalsOf = /* @__PURE__ */ new Map();
+  for (const [scale, values] of groups2) {
+    decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
+  }
+  const space = opts.unitSuffix === "shortSpace" ? " " : "";
+  return breaks.map((v, i) => {
+    const [scale, letter] = cuts[i];
+    const decimals = decimalsOf.get(scale) ?? 0;
+    const nf = intl(opts.locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return nf.format(v / scale) + (letter ? space + letter : "");
+  });
 }
 var UNIT_SCALE = {
   thousands: 1e3,
@@ -5015,7 +5045,8 @@ function formatInUnit(breaks, unit2, opts = {}, grouping = false) {
     maximumFractionDigits: decimals,
     useGrouping: grouping
   });
-  const suffix = unitSuffix(unit2, opts.locale);
+  const style = opts.unitSuffix ?? "short";
+  const suffix = style === "locale" ? unitSuffix(unit2, opts.locale) : (style === "shortSpace" ? " " : "") + UNIT_FALLBACK[unit2];
   return scaled.map((v) => nf.format(v) + suffix);
 }
 function formatCurrency(breaks, opts = {}) {
@@ -8832,28 +8863,81 @@ function formatLikeAxis(value, ticks2, labelFormat, fmt) {
     if (diff > 0 && Number.isFinite(diff)) {
       let p = Math.pow(10, Math.floor(Math.log10(diff) + 1e-9) - 1);
       if (finite.every((t2) => Math.round(t2 / p) % 10 === 0)) p *= 10;
+      p /= 10;
       rounded = Math.round(value / p) * p;
     }
   }
   const labels = formatBreaksAs([...finite, rounded], labelFormat, fmt);
   return labels[labels.length - 1];
 }
+function segmentHitsBox(ax, ay, bx, by, b) {
+  let t02 = 0;
+  let t12 = 1;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const edges = [
+    [-dx, ax - b.x0],
+    [dx, b.x1 - ax],
+    [-dy, ay - b.y0],
+    [dy, b.y1 - ay]
+  ];
+  for (const [p, q2] of edges) {
+    if (p === 0) {
+      if (q2 < 0) return false;
+      continue;
+    }
+    const r = q2 / p;
+    if (p < 0) {
+      if (r > t12) return false;
+      if (r > t02) t02 = r;
+    } else {
+      if (r < t02) return false;
+      if (r < t12) t12 = r;
+    }
+  }
+  return t02 <= t12;
+}
 function drawEndMarks(ctx, yTicks) {
   const { panelG, xScale, yScale, theme: theme2, geoms, layerData, colorScale, innerHeight: innerHeight2 } = ctx;
   const xo = bandOffset(xScale);
   const yo = bandOffset(yScale);
   const fontSize = theme2.axisTextSize;
-  const placed = [];
   const numericTicks = yTicks.filter((t2) => typeof t2 === "number");
+  const px = (p) => Number(xScale(p.x)) + xo;
+  const py = (p) => Number(yScale(p.y)) + yo;
+  const isLineLike = (t2) => t2 === "line" || t2 === "area" || t2 === "smooth";
+  const polylines = [];
+  const groupsOf = (li) => {
+    const pts = (layerData[li] ?? []).filter((p) => p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
+    return group(pts, (p) => p.color === void 0 ? "" : String(p.color));
+  };
+  geoms.forEach((geom, li) => {
+    if (!isLineLike(geom.type)) return;
+    for (const groupPts of groupsOf(li).values()) {
+      polylines.push([...groupPts].sort((a, b) => px(a) - px(b)).map((p) => [px(p), py(p)]));
+    }
+  });
+  const placed = [];
+  const collisions = (b) => {
+    const pad2 = { x0: b.x0 - 1, x1: b.x1 + 1, y0: b.y0 - 1, y1: b.y1 + 1 };
+    let n = 0;
+    for (const line of polylines) {
+      for (let i = 1; i < line.length; i++) {
+        const [ax, ay] = line[i - 1];
+        const [bx, by] = line[i];
+        if (segmentHitsBox(ax, ay, bx, by, pad2)) n++;
+      }
+    }
+    for (const q2 of placed) {
+      if (b.x0 < q2.x1 && b.x1 > q2.x0 && b.y0 < q2.y1 && b.y1 > q2.y0) n += 10;
+    }
+    return n;
+  };
   let group2;
   geoms.forEach((geom, li) => {
     if (geom.type !== "line" && geom.type !== "area") return;
     if (!geom.endPoint && !geom.endLabel) return;
-    const px = (p) => Number(xScale(p.x)) + xo;
-    const py = (p) => Number(yScale(p.y)) + yo;
-    const pts = (layerData[li] ?? []).filter((p) => p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
-    const groups2 = group(pts, (p) => p.color === void 0 ? "" : String(p.color));
-    for (const [key, groupPts] of groups2) {
+    for (const [key, groupPts] of groupsOf(li)) {
       const sorted = [...groupPts].sort((a, b2) => px(a) - px(b2));
       const last = sorted[sorted.length - 1];
       const prev = sorted[sorted.length - 2];
@@ -8866,21 +8950,51 @@ function drawEndMarks(ctx, yTicks) {
       const r = Math.max(2.5, lineWidth * 1.4);
       if (geom.endPoint) {
         group2.append("circle").attr("class", "ggpbi-end-point").attr("cx", x2).attr("cy", y2).attr("r", r).attr("fill", color2);
+        placed.push({ x0: x2 - r, x1: x2 + r, y0: y2 - r, y1: y2 + r });
       }
       if (!geom.endLabel) continue;
-      const text = geom.labelTemplate ? renderLabelTemplate(geom.labelTemplate, last) : typeof last.y === "number" ? formatLikeAxis(last.y, numericTicks, ctx.yLabelFormat, { ...ctx.format, unit: ctx.yLabelUnit }) : String(last.y);
+      const text = geom.labelTemplate ? renderLabelTemplate(geom.labelTemplate, last) : typeof last.y === "number" ? formatLikeAxis(
+        last.y,
+        numericTicks,
+        ctx.yLabelFormat,
+        { ...ctx.format, unit: ctx.yLabelUnit, unitSuffix: ctx.yUnitSuffix }
+      ) : String(last.y);
       if (!text) continue;
-      const w = text.length * fontSize * 0.6;
+      const w = text.length * fontSize * (geom.labelTemplate ? 0.58 : 0.62);
+      const h = fontSize;
       const gap = (geom.endPoint ? r : lineWidth / 2) + fontSize * 0.35;
-      const box = (above2) => above2 ? { x0: x2 - w, x1: x2, y0: y2 - gap - fontSize, y1: y2 - gap } : { x0: x2 - w, x1: x2, y0: y2 + gap, y1: y2 + gap + fontSize };
-      let above = !prev || py(prev) >= y2;
-      if (above && box(true).y0 < -theme2.halfLine * 2) above = false;
-      else if (!above && box(false).y1 > innerHeight2) above = true;
-      const hits = (b2) => placed.some((q2) => b2.x0 < q2.x1 && b2.x1 > q2.x0 && b2.y0 < q2.y1 && b2.y1 > q2.y0);
-      if (hits(box(above)) && !hits(box(!above))) above = !above;
-      const b = box(above);
+      const spots = {
+        above: { x0: x2 - w, x1: x2, y0: y2 - gap - h, y1: y2 - gap },
+        below: { x0: x2 - w, x1: x2, y0: y2 + gap, y1: y2 + gap + h },
+        beside: { x0: x2 - gap - w, x1: x2 - gap, y0: y2 - h / 2, y1: y2 + h / 2 },
+        higher: { x0: x2 - w, x1: x2, y0: y2 - gap - 2 * h, y1: y2 - gap - h },
+        lower: { x0: x2 - w, x1: x2, y0: y2 + gap + h, y1: y2 + gap + 2 * h }
+      };
+      const dy = prev ? y2 - py(prev) : 0;
+      const order = !prev || Math.abs(dy) < 0.5 ? ["above", "below", "beside", "higher", "lower"] : dy < 0 ? ["above", "beside", "below", "higher", "lower"] : ["below", "beside", "above", "lower", "higher"];
+      const candidates = order.map((name2) => spots[name2]);
+      for (const k of [0.5, 1, 1.5, 2, 3]) {
+        const s = w * k;
+        for (const name2 of [order[0], order[2]]) {
+          const b2 = spots[name2];
+          candidates.push({ x0: b2.x0 - s, x1: b2.x1 - s, y0: b2.y0, y1: b2.y1 });
+        }
+      }
+      const inside = (b2) => b2.x0 >= 0 && b2.y0 >= -theme2.halfLine * 2 && b2.y1 <= innerHeight2;
+      let best;
+      let bestScore = Infinity;
+      for (const b2 of candidates) {
+        if (!inside(b2)) continue;
+        const score2 = collisions(b2);
+        if (score2 < bestScore) {
+          best = b2;
+          bestScore = score2;
+          if (score2 === 0) break;
+        }
+      }
+      const b = best ?? candidates[0];
       placed.push(b);
-      group2.append("text").attr("class", "ggpbi-end-label").attr("x", x2).attr("y", b.y1 - fontSize * 0.2).attr("text-anchor", "end").attr("font-size", `${fontSize}px`).attr("font-weight", geom.labelTemplate ? 400 : 600).attr("fill", color2).text(text);
+      group2.append("text").attr("class", "ggpbi-end-label").attr("x", b.x1).attr("y", b.y1 - fontSize * 0.2).attr("text-anchor", "end").attr("font-size", `${fontSize}px`).attr("font-weight", geom.labelTemplate ? 400 : 600).attr("fill", color2).text(text);
     }
   });
 }
@@ -8891,13 +9005,13 @@ function renderPanel(ctx) {
     xScale,
     theme2.nBreaks,
     ctx.xLabelFormat,
-    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit }
+    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit, unitSuffix: ctx.xUnitSuffix }
   );
   const yBreaks = ggBreaks(
     yScale,
     theme2.nBreaks,
     ctx.yLabelFormat,
-    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit }
+    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit, unitSuffix: ctx.yUnitSuffix }
   );
   const isBandX = typeof xScale.bandwidth === "function";
   const xTicks = isBandX ? [] : xBreaks?.ticks ?? (xScale.ticks ? xScale.ticks(theme2.nBreaks) : []);
@@ -9221,6 +9335,7 @@ function geomArgs(geom) {
 var R_SCALE_ARG = {
   dateBreaks: "date_breaks",
   labelUnit: "label_unit",
+  unitSuffix: "unit_suffix",
   labelColor: "label_colour"
 };
 function scaleLine(axis2, cfg) {
@@ -37937,7 +38052,7 @@ var GEOM_OPTIONS = [
   "varwidth",
   "naRm"
 ];
-var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels", "dateBreaks", "labelUnit", "labelColor", "position"];
+var SCALE_KEYS = ["type", "min", "max", "labels", "dateLabels", "dateBreaks", "labelUnit", "unitSuffix", "labelColor", "position"];
 var FACET_KEYS = ["wrap", "row", "col", "ncol", "nrow", "freeX", "freeY", "heights", "strips", "rowAxes"];
 var THEME_KEYS = ["preset", "panelFill", "gridColor", "ink", "paper", "baseSize", "fontFamily", "gridX", "gridY", "gridMinor", "ticks"];
 var THEME_PRESETS = ["grey", "minimal", "dark"];
@@ -38080,6 +38195,7 @@ var R_NAMED_ARGS = [
   "position",
   "date_breaks",
   "label_unit",
+  "unit_suffix",
   "label_colour",
   "strip",
   "row_axes"
@@ -39246,7 +39362,7 @@ function estimateYTickLabelWidth(spec, data, theme2) {
     if (!isFinite(lo) || !isFinite(hi)) return 0;
     if (yCfg.min !== void 0) lo = yCfg.min;
     if (yCfg.max !== void 0) hi = yCfg.max;
-    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme2.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit, unitSuffix: yCfg.unitSuffix });
   }
   let maxWidth = 0;
   for (const label of labels) {
@@ -39565,6 +39681,8 @@ function axisOptions(xCfg, yCfg) {
     yPosition: yCfg.position,
     xLabelUnit: xCfg.labelUnit,
     yLabelUnit: yCfg.labelUnit,
+    xUnitSuffix: xCfg.unitSuffix,
+    yUnitSuffix: yCfg.unitSuffix,
     xLabelColor: xCfg.labelColor,
     yLabelColor: yCfg.labelColor,
     xDateBreaks: xCfg.dateBreaks,
@@ -39663,7 +39781,7 @@ function renderFaceted(g, svg, built) {
     } else {
       const [lo, hi] = scale.domain().map(Number);
       const ticks2 = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi ? extendedBreaks(lo, hi, theme2.nBreaks).filter((t2) => t2 >= lo && t2 <= hi) : [];
-      labels = formatBreaksAs(ticks2, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
+      labels = formatBreaksAs(ticks2, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit, unitSuffix: yCfg.unitSuffix });
     }
     return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme2.axisTextSize)), 0);
   };
@@ -40388,6 +40506,10 @@ function mapScale(call, patch) {
       cfg.labelUnit = arg.value;
       continue;
     }
+    if (arg.name === "unit_suffix") {
+      cfg.unitSuffix = arg.value;
+      continue;
+    }
     if (arg.name === "label_colour" || arg.name === "label_color") {
       cfg.labelColor = arg.value;
       continue;
@@ -40621,6 +40743,7 @@ var THEME_OPTION_MAP = {
   fontFamily: { prop: "fontFamily", map: (v) => typeof v === "string" ? v : void 0 }
 };
 var LABEL_UNITS = /* @__PURE__ */ new Set(["none", "thousands", "millions", "billions"]);
+var UNIT_SUFFIXES = /* @__PURE__ */ new Set(["short", "shortSpace", "locale"]);
 var THEME_HOST_KEYS = /* @__PURE__ */ new Set(["colorPalette", "isHighContrast"]);
 function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
   const instances = [];
@@ -40688,6 +40811,7 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
     labels: "labelFormat",
     dateLabels: "dateFormat",
     labelUnit: "labelUnit",
+    unitSuffix: "unitSuffix",
     labelColor: "labelColor",
     dateBreaks: "dateBreaks",
     position: "position"
@@ -40701,6 +40825,7 @@ function computePaneWriteback(patch, live, merged, paneDefaults = {}) {
       else if (key === "labels" && LABEL_FORMATS.has(value)) properties.labelFormat = value;
       else if (key === "dateLabels" && DATE_FORMATS.has(value)) properties.dateFormat = value;
       else if (key === "labelUnit" && LABEL_UNITS.has(value)) properties.labelUnit = value;
+      else if (key === "unitSuffix" && UNIT_SUFFIXES.has(value)) properties.unitSuffix = value;
       else if (key === "labelColor" && typeof value === "string") properties.labelColor = fill(value);
       else if (key === "dateBreaks" && typeof value === "string") properties.dateBreaks = value;
       else if (key === "position" && axis2 === "y" && (value === "left" || value === "right")) properties.position = value;

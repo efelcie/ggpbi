@@ -177,6 +177,8 @@ function axisOptions(xCfg: AxisScaleConfig, yCfg: AxisScaleConfig) {
     yPosition: yCfg.position,
     xLabelUnit: xCfg.labelUnit,
     yLabelUnit: yCfg.labelUnit,
+    xUnitSuffix: xCfg.unitSuffix,
+    yUnitSuffix: yCfg.unitSuffix,
     xLabelColor: xCfg.labelColor,
     yLabelColor: yCfg.labelColor,
     xDateBreaks: xCfg.dateBreaks,
@@ -339,7 +341,7 @@ function renderFaceted(
       const ticks = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi
         ? extendedBreaks(lo, hi, theme.nBreaks).filter(t => t >= lo && t <= hi)
         : [];
-      labels = formatBreaksAs(ticks, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
+      labels = formatBreaksAs(ticks, yCfg.labels, { ...spec.format, unit: yCfg.labelUnit, unitSuffix: yCfg.unitSuffix });
     }
     return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme.axisTextSize)), 0);
   };
