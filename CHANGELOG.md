@@ -1,6 +1,6 @@
 # ggpbi Development Log
 
-## Unreleased
+## 2026-11-09 - v0.7.0
 
 - `compact` labels and display units name their unit with ggplot2's
   letters K, M, B, T (`scales::cut_short_scale()`) by default, whatever the
