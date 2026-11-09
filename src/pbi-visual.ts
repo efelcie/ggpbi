@@ -970,11 +970,14 @@ export class Visual implements IVisual {
             // the generated code stays as short as the chart is plain.
             const axisExtras = (card: typeof s.scaleX | typeof s.scaleY, objectName: string) => {
               const unit = extractDropdown(card.labelUnit.value);
+              const suffix = extractDropdown(card.unitSuffix.value);
               // Empty picker = theme colour.
               const color = extractFill(card.labelColor.value, objectName, 'labelColor');
               const breaks = String(card.dateBreaks.value ?? '').trim();
               return {
                 ...(unit && unit !== 'none' && { labelUnit: unit as import('./types').AxisScaleConfig['labelUnit'] }),
+                // 'short' is the default — only the other two reach the spec.
+                ...((suffix === 'shortSpace' || suffix === 'locale') && { unitSuffix: suffix as 'shortSpace' | 'locale' }),
                 ...(color && { labelColor: color }),
                 ...(breaks && { dateBreaks: breaks }),
               };

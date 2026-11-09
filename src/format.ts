@@ -18,7 +18,18 @@ export interface FormatOptions {
   locale?: string;
   /** ISO 4217 code for `currency` formatting, e.g. "EUR". */
   currency?: string;
+  /**
+   * How `compact` and fixed display units name their unit. Default
+   * 'short': K, M, B, T as in `scales::cut_short_scale()` — "7.6M", or
+   * "7,6M" with a German decimal mark. 'shortSpace' puts a space before the
+   * letter ("7,6 M", like a Power BI format string `#,0,,.0 M`). 'locale'
+   * takes the report language's own word ("7,6 Mio.").
+   */
+  unitSuffix?: UnitSuffix;
 }
+
+/** Unit naming for `compact` and display units. */
+export type UnitSuffix = 'short' | 'shortSpace' | 'locale';
 
 /**
  * How many decimals the break sequence needs.
@@ -115,8 +126,10 @@ function compactScale(v: number, probe: Intl.NumberFormat): number {
 
 /**
  * Short scale: 1.2M, 450K — R's
- * `scales::label_number(scale_cut = cut_short_scale())`, with the locale's
- * own suffixes ("1,2 Mio." in German) from `Intl`'s compact notation.
+ * `scales::label_number(scale_cut = cut_short_scale())`. By default with
+ * the letters K, M, B, T (see `formatShortScale`); with `unitSuffix:
+ * 'locale'` the report language's own suffixes ("1,2 Mio." in German)
+ * from `Intl`'s compact notation, as below.
  *
  * Each value gets its own unit, and the decimals come from the breaks
  * like `scales::precision()`: computed per unit, so every label of the
@@ -126,6 +139,7 @@ function compactScale(v: number, probe: Intl.NumberFormat): number {
  * scales' `scale_cut()`.
  */
 export function formatCompact(breaks: number[], opts: FormatOptions = {}): string[] {
+  if ((opts.unitSuffix ?? 'short') !== 'locale') return formatShortScale(breaks, opts);
   let probe: Intl.NumberFormat;
   try {
     // Latin digits so the probe can be parsed back; the unit choice is the same.
@@ -152,13 +166,6 @@ export function formatCompact(breaks: number[], opts: FormatOptions = {}): strin
   // break. scales gives a lone value in its unit no decimals, so breaks
   // 0 and 2.5M (a flat facet panel) read "0" and "2M"; here the group keeps
   // the decimals its values need (up to three).
-  const exactDecimals = (v: number): number => {
-    for (let d = 0; d < 3; d++) {
-      const f = Math.pow(10, d);
-      if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
-    }
-    return 3;
-  };
   const decimalsOf = new Map<number, number>();
   for (const [scale, values] of groups) {
     decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
@@ -179,6 +186,58 @@ export function formatCompact(breaks: number[], opts: FormatOptions = {}): strin
     return nf;
   };
   return breaks.map((v, i) => formatterFor(decimalsOf.get(scales[i]) ?? 0).format(v));
+}
+
+/** One deliberate departure from scales: a label never misstates its break. */
+function exactDecimals(v: number): number {
+  for (let d = 0; d < 3; d++) {
+    const f = Math.pow(10, d);
+    if (Math.abs(Math.round(v * f) / f - v) < 1e-9 * Math.max(1, Math.abs(v))) return d;
+  }
+  return 3;
+}
+
+/** `scales::cut_short_scale()`: the cut points and their letters. */
+const SHORT_SCALE: Array<[number, string]> = [
+  [1e12, 'T'],
+  [1e9, 'B'],
+  [1e6, 'M'],
+  [1e3, 'K'],
+];
+
+/**
+ * `compact` with the short-scale letters K, M, B, T — exactly
+ * `scales::label_number(scale_cut = cut_short_scale())`: each value takes
+ * the largest cut it reaches, zeros and values under 1,000 stay unscaled,
+ * and the decimals come from `precision()` per unit. Only the decimal and
+ * group marks follow the locale: "7.6M" in English, "7,6M" in German —
+ * with `shortSpace` "7,6 M", the way Power BI format strings write it.
+ */
+function formatShortScale(breaks: number[], opts: FormatOptions): string[] {
+  const cut = (v: number): [number, string] =>
+    SHORT_SCALE.find(([c]) => Math.abs(v) >= c) ?? [1, ''];
+  const cuts = breaks.map(v => (Number.isFinite(v) && v !== 0 ? cut(v) : [1, ''] as [number, string]));
+
+  const groups = new Map<number, number[]>();
+  breaks.forEach((v, i) => {
+    if (!Number.isFinite(v)) return;
+    const [scale] = cuts[i];
+    const group = groups.get(scale);
+    if (group) group.push(v / scale);
+    else groups.set(scale, [v / scale]);
+  });
+  const decimalsOf = new Map<number, number>();
+  for (const [scale, values] of groups) {
+    decimalsOf.set(scale, Math.max(breakDecimals(values), ...values.map(exactDecimals)));
+  }
+
+  const space = opts.unitSuffix === 'shortSpace' ? ' ' : '';
+  return breaks.map((v, i) => {
+    const [scale, letter] = cuts[i];
+    const decimals = decimalsOf.get(scale) ?? 0;
+    const nf = intl(opts.locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return nf.format(v / scale) + (letter ? space + letter : '');
+  });
 }
 
 /** A fixed display unit for every label of an axis. */
@@ -239,7 +298,10 @@ export function formatInUnit(
     maximumFractionDigits: decimals,
     useGrouping: grouping,
   });
-  const suffix = unitSuffix(unit, opts.locale);
+  const style = opts.unitSuffix ?? 'short';
+  const suffix = style === 'locale'
+    ? unitSuffix(unit, opts.locale)
+    : (style === 'shortSpace' ? ' ' : '') + UNIT_FALLBACK[unit];
   return scaled.map(v => nf.format(v) + suffix);
 }
 

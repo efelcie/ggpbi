@@ -44,8 +44,10 @@ describe('number formats', () => {
   it('compact is the point of the exercise', () => {
     expect(formatCompact([1200000], EN)).toEqual(['1.2M']);
     expect(formatCompact([450000], EN)).toEqual(['450K']);
-    // German uses its own suffix, not a translated "M".
-    expect(formatCompact([1200000], DE)[0]).toMatch(/Mio/);
+    // ggplot2's letters by default, with the German decimal mark …
+    expect(formatCompact([1200000], DE)).toEqual(['1,2M']);
+    // … and the German word on request.
+    expect(formatCompact([1200000], { ...DE, unitSuffix: 'locale' })[0]).toMatch(/Mio/);
   });
 
   it('compact takes its decimals from the breaks, the same within a unit', () => {
@@ -74,13 +76,27 @@ describe('number formats', () => {
     expect(formatCompact([0, 2.5e6], EN)).toEqual(['0', '2.5M']);
   });
 
-  it('compact follows the locale’s units and decimal mark', () => {
-    // Intl separates number and suffix with a no-break space.
-    expect(formatCompact([7e6, 7.5e6], DE).map(s => s.replace(/ /g, ' ')))
+  it('compact names its units three ways, the marks always from the locale', () => {
+    // short (default): scales::cut_short_scale() letters.
+    expect(formatCompact([7e6, 7.5e6], DE)).toEqual(['7,0M', '7,5M']);
+    // shortSpace: the report's "7,6 M", a Power BI format string #,0,,.0 M.
+    expect(formatCompact([7e6, 7.5e6], { ...DE, unitSuffix: 'shortSpace' })).toEqual(['7,0 M', '7,5 M']);
+    // locale: the language's own word (Intl puts a no-break space before it).
+    expect(formatCompact([7e6, 7.5e6], { ...DE, unitSuffix: 'locale' }).map(s => s.replace(/ /g, ' ')))
       .toEqual(['7,0 Mio.', '7,5 Mio.']);
-    // Indian English counts in lakh; the decimals still follow the breaks.
-    expect(formatCompact([1.29e6, 1.3e6, 1.31e6], { locale: 'en-IN' }))
+    // Indian English counts in lakh — only in its own words.
+    expect(formatCompact([1.29e6, 1.3e6, 1.31e6], { locale: 'en-IN', unitSuffix: 'locale' }))
       .toEqual(['12.9L', '13.0L', '13.1L']);
+    expect(formatCompact([1.29e6, 1.3e6, 1.31e6], { locale: 'en-IN' }))
+      .toEqual(['1.29M', '1.30M', '1.31M']);
+  });
+
+  it('short letters follow cut_short_scale: K, M, B, T, nothing under 1,000', () => {
+    expect(formatCompact([0, 250, 500, 750, 1000], EN)).toEqual(['0', '250', '500', '750', '1K']);
+    expect(formatCompact([0, 5e8, 1e9, 1.5e9], EN)).toEqual(['0', '500M', '1.0B', '1.5B']);
+    expect(formatCompact([2e12], EN)).toEqual(['2T']);
+    // German thousands get their letter too — Intl's German has none.
+    expect(formatCompact([0, 5e5, 1e6], DE)).toEqual(['0', '500K', '1M']);
   });
 
   it('currency places the symbol the way the locale expects', () => {

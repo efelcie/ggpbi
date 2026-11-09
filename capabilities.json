@@ -1635,6 +1635,26 @@
             ]
           }
         },
+        "unitSuffix": {
+          "displayName": "Unit suffix",
+          "description": "How Compact labels and display units name the unit: Short = K, M, B, T as ggplot2 (scales::cut_short_scale) writes them, \"7,6M\"; Short with space = \"7,6 M\", like a Power BI format string #,0,,.0 M; Report language = the language's own word, \"7,6 Mio.\". Decimal and group marks always follow the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "short",
+                "displayName": "Short (7.6M)"
+              },
+              {
+                "value": "shortSpace",
+                "displayName": "Short with space (7.6 M)"
+              },
+              {
+                "value": "locale",
+                "displayName": "Report language (7,6 Mio.)"
+              }
+            ]
+          }
+        },
         "dateFormat": {
           "displayName": "Date format",
           "description": "Granularity for a time axis. Auto follows the tick spacing; month names always come from the report locale.",
@@ -1795,6 +1815,26 @@
               {
                 "value": "billions",
                 "displayName": "Billions"
+              }
+            ]
+          }
+        },
+        "unitSuffix": {
+          "displayName": "Unit suffix",
+          "description": "How Compact labels and display units name the unit: Short = K, M, B, T as ggplot2 (scales::cut_short_scale) writes them, \"7,6M\"; Short with space = \"7,6 M\", like a Power BI format string #,0,,.0 M; Report language = the language's own word, \"7,6 Mio.\". Decimal and group marks always follow the report locale.",
+          "type": {
+            "enumeration": [
+              {
+                "value": "short",
+                "displayName": "Short (7.6M)"
+              },
+              {
+                "value": "shortSpace",
+                "displayName": "Short with space (7.6 M)"
+              },
+              {
+                "value": "locale",
+                "displayName": "Report language (7,6 Mio.)"
               }
             ]
           }

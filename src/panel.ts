@@ -17,7 +17,7 @@ import type { PanelSharedState } from './scene-types';
 import { renderSceneNodes } from './scene-renderer';
 import type { LabelFormat } from './types';
 import { extendedBreaks, formatBreaksAs, minorBreaks } from './breaks';
-import { formatDates, type FormatOptions, type DateFormat, type LabelUnit } from './format';
+import { formatDates, type FormatOptions, type DateFormat, type LabelUnit, type UnitSuffix } from './format';
 
 /**
  * ggplot2's `date_breaks` ("6 months", "1 year", "2 weeks") as a d3
@@ -133,8 +133,11 @@ function applyOverlapCheck(
 }
 
 /**
- * A value as the y axis would print it, at the axis's precision: the end
- * label of "7,531,234" on an axis of 5.5M … 7.5M reads "7.5M".
+ * A value as the y axis would print it, one digit finer than the axis: an
+ * end label must not round the very number it is there to show. On an axis
+ * of 4M … 7M (whole millions) the line ending at 7.62M reads "7.6M", on an
+ * axis of 95 % … 100 % an end at 96.5 % reads "96.5 %". Same format, unit
+ * and suffix as the axis labels.
  */
 export function formatLikeAxis(
   value: number,
@@ -148,8 +151,11 @@ export function formatLikeAxis(
     let diff = Infinity;
     for (let i = 1; i < finite.length; i++) diff = Math.min(diff, finite[i] - finite[i - 1]);
     if (diff > 0 && Number.isFinite(diff)) {
+      // The axis precision (scales::precision on the breaks), then one
+      // digit finer.
       let p = Math.pow(10, Math.floor(Math.log10(diff) + 1e-9) - 1);
       if (finite.every(t => Math.round(t / p) % 10 === 0)) p *= 10;
+      p /= 10;
       rounded = Math.round(value / p) * p;
     }
   }
@@ -157,33 +163,94 @@ export function formatLikeAxis(
   return labels[labels.length - 1];
 }
 
+interface Box { x0: number; x1: number; y0: number; y1: number }
+
+/** Does the segment (ax, ay)–(bx, by) cross the box? Liang–Barsky clipping. */
+function segmentHitsBox(ax: number, ay: number, bx: number, by: number, b: Box): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const edges: Array<[number, number]> = [
+    [-dx, ax - b.x0], [dx, b.x1 - ax], [-dy, ay - b.y0], [dy, b.y1 - ay],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+  return t0 <= t1;
+}
+
 /**
  * Direct labels at the end of line and area layers: a dot at the last
  * point and/or its value (or a template text such as "Prior year") in the
  * layer colour — ggplot2's geom_point()/geom_text() on slice_max(.x, x).
- * A label sits beside its point, above it when the line rises into the
- * point and below when it falls, inside the panel, and steps aside for a
- * label already placed.
+ *
+ * The label takes the first free spot around its point — above or below,
+ * beside it on the left, or one line further out — where "free" means no
+ * line of the panel runs through it and no other end label sits there,
+ * like ggrepel's search for a spot that keeps the label off the data. The
+ * order follows the line: a rising line looks above first, a falling one
+ * below, a steep drop finds the room beside it. When another line crosses
+ * every spot at the end, the label slides left along its line. Labels stay
+ * inside the panel (they may reach into the plot margin above it).
  */
 function drawEndMarks(ctx: PanelInput, yTicks: Array<number | Date>): void {
   const { panelG, xScale, yScale, theme, geoms, layerData, colorScale, innerHeight } = ctx;
   const xo = bandOffset(xScale);
   const yo = bandOffset(yScale);
   const fontSize = theme.axisTextSize;
-  const placed: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
   const numericTicks = yTicks.filter((t): t is number => typeof t === 'number');
-  let group: d3.Selection<SVGGElement, unknown, null, undefined> | undefined;
+  const px = (p: BoundPoint) => Number(xScale(p.x)) + xo;
+  const py = (p: BoundPoint) => Number(yScale(p.y)) + yo;
+  const isLineLike = (t: string) => t === 'line' || t === 'area' || t === 'smooth';
 
+  // Obstacles: every line of the panel, as pixel polylines per colour group.
+  const polylines: Array<Array<[number, number]>> = [];
+  const groupsOf = (li: number) => {
+    const pts = (layerData[li] ?? []).filter(p =>
+      p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
+    return d3.group(pts, p => (p.color === undefined ? '' : String(p.color)));
+  };
+  geoms.forEach((geom, li) => {
+    if (!isLineLike(geom.type)) return;
+    for (const groupPts of groupsOf(li).values()) {
+      polylines.push([...groupPts].sort((a, b) => px(a) - px(b)).map(p => [px(p), py(p)]));
+    }
+  });
+  const placed: Box[] = [];
+  const collisions = (b: Box): number => {
+    const pad = { x0: b.x0 - 1, x1: b.x1 + 1, y0: b.y0 - 1, y1: b.y1 + 1 };
+    let n = 0;
+    for (const line of polylines) {
+      for (let i = 1; i < line.length; i++) {
+        const [ax, ay] = line[i - 1];
+        const [bx, by] = line[i];
+        if (segmentHitsBox(ax, ay, bx, by, pad)) n++;
+      }
+    }
+    for (const q of placed) {
+      if (b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0) n += 10;
+    }
+    return n;
+  };
+
+  let group: d3.Selection<SVGGElement, unknown, null, undefined> | undefined;
   geoms.forEach((geom, li) => {
     if (geom.type !== 'line' && geom.type !== 'area') return;
     if (!geom.endPoint && !geom.endLabel) return;
-    const px = (p: BoundPoint) => Number(xScale(p.x)) + xo;
-    const py = (p: BoundPoint) => Number(yScale(p.y)) + yo;
-    const pts = (layerData[li] ?? []).filter(p =>
-      p.x != null && p.y != null && Number.isFinite(px(p)) && Number.isFinite(py(p)));
-    const groups = d3.group(pts, p => (p.color === undefined ? '' : String(p.color)));
 
-    for (const [key, groupPts] of groups) {
+    for (const [key, groupPts] of groupsOf(li)) {
       const sorted = [...groupPts].sort((a, b) => px(a) - px(b));
       const last = sorted[sorted.length - 1];
       const prev = sorted[sorted.length - 2];
@@ -200,36 +267,65 @@ function drawEndMarks(ctx: PanelInput, yTicks: Array<number | Date>): void {
           .attr('class', 'ggpbi-end-point')
           .attr('cx', x).attr('cy', y).attr('r', r)
           .attr('fill', color);
+        // A dot is an obstacle for the labels that follow.
+        placed.push({ x0: x - r, x1: x + r, y0: y - r, y1: y + r });
       }
       if (!geom.endLabel) continue;
 
       const text = geom.labelTemplate
         ? renderLabelTemplate(geom.labelTemplate, last)
         : typeof last.y === 'number'
-          ? formatLikeAxis(last.y, numericTicks, ctx.yLabelFormat, { ...ctx.format, unit: ctx.yLabelUnit })
+          ? formatLikeAxis(last.y, numericTicks, ctx.yLabelFormat,
+            { ...ctx.format, unit: ctx.yLabelUnit, unitSuffix: ctx.yUnitSuffix })
           : String(last.y);
       if (!text) continue;
 
-      const w = text.length * fontSize * 0.6;
+      const w = text.length * fontSize * (geom.labelTemplate ? 0.58 : 0.62);
+      const h = fontSize;
       const gap = (geom.endPoint ? r : lineWidth / 2) + fontSize * 0.35;
-      const box = (above: boolean) => (above
-        ? { x0: x - w, x1: x, y0: y - gap - fontSize, y1: y - gap }
-        : { x0: x - w, x1: x, y0: y + gap, y1: y + gap + fontSize });
-      // Above a rising line, below a falling one — the free side. A label
-      // may reach into the plot margin above the panel (an LTM line ends
-      // at its top), never into the x axis below it.
-      let above = !prev || py(prev) >= y;
-      if (above && box(true).y0 < -theme.halfLine * 2) above = false;
-      else if (!above && box(false).y1 > innerHeight) above = true;
-      const hits = (b: ReturnType<typeof box>) =>
-        placed.some(q => b.x0 < q.x1 && b.x1 > q.x0 && b.y0 < q.y1 && b.y1 > q.y0);
-      if (hits(box(above)) && !hits(box(!above))) above = !above;
-      const b = box(above);
+      const spots: Record<string, Box> = {
+        above: { x0: x - w, x1: x, y0: y - gap - h, y1: y - gap },
+        below: { x0: x - w, x1: x, y0: y + gap, y1: y + gap + h },
+        beside: { x0: x - gap - w, x1: x - gap, y0: y - h / 2, y1: y + h / 2 },
+        higher: { x0: x - w, x1: x, y0: y - gap - 2 * h, y1: y - gap - h },
+        lower: { x0: x - w, x1: x, y0: y + gap + h, y1: y + gap + 2 * h },
+      };
+      // Screen y grows downwards: dy < 0 means the line rises into the point.
+      const dy = prev ? y - py(prev) : 0;
+      const order = !prev || Math.abs(dy) < 0.5
+        ? ['above', 'below', 'beside', 'higher', 'lower']
+        : dy < 0
+          ? ['above', 'beside', 'below', 'higher', 'lower']
+          : ['below', 'beside', 'above', 'lower', 'higher'];
+      // When every spot at the end is taken (another line crosses there),
+      // slide along the line to the left, above and below it — a label
+      // on a reference line can stand wherever the line is free.
+      const candidates: Box[] = order.map(name => spots[name]);
+      for (const k of [0.5, 1, 1.5, 2, 3]) {
+        const s = w * k;
+        for (const name of [order[0], order[2]]) {
+          const b = spots[name];
+          candidates.push({ x0: b.x0 - s, x1: b.x1 - s, y0: b.y0, y1: b.y1 });
+        }
+      }
+      const inside = (b: Box) => b.x0 >= 0 && b.y0 >= -theme.halfLine * 2 && b.y1 <= innerHeight;
+      let best: Box | undefined;
+      let bestScore = Infinity;
+      for (const b of candidates) {
+        if (!inside(b)) continue;
+        const score = collisions(b);
+        if (score < bestScore) {
+          best = b;
+          bestScore = score;
+          if (score === 0) break;
+        }
+      }
+      const b = best ?? candidates[0];
       placed.push(b);
 
       group.append('text')
         .attr('class', 'ggpbi-end-label')
-        .attr('x', x)
+        .attr('x', b.x1)
         .attr('y', b.y1 - fontSize * 0.2)
         .attr('text-anchor', 'end')
         .attr('font-size', `${fontSize}px`)
@@ -287,6 +383,9 @@ export interface PanelInput {
   /** Fixed display units for the tick labels (Power BI display units). */
   xLabelUnit?: LabelUnit;
   yLabelUnit?: LabelUnit;
+  /** Unit naming for compact labels and display units (K/M, "7,6 M", "Mio."). */
+  xUnitSuffix?: UnitSuffix;
+  yUnitSuffix?: UnitSuffix;
   /** Tick label colours; default the theme's axis text colour. */
   xLabelColor?: string;
   yLabelColor?: string;
@@ -313,9 +412,9 @@ export function renderPanel(ctx: PanelInput): void {
 
   // Breaks via Wilkinson Extended algorithm (like ggplot2)
   const xBreaks = ggBreaks(xScale, theme.nBreaks, ctx.xLabelFormat,
-    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit });
+    { ...ctx.format, dateFormat: ctx.xDateFormat, dateBreaks: ctx.xDateBreaks, unit: ctx.xLabelUnit, unitSuffix: ctx.xUnitSuffix });
   const yBreaks = ggBreaks(yScale, theme.nBreaks, ctx.yLabelFormat,
-    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit });
+    { ...ctx.format, dateFormat: ctx.yDateFormat, dateBreaks: ctx.yDateBreaks, unit: ctx.yLabelUnit, unitSuffix: ctx.yUnitSuffix });
 
   const isBandX = typeof (xScale as any).bandwidth === 'function';
   const xTicks = isBandX ? [] : (xBreaks?.ticks ?? ((xScale as any).ticks ? (xScale as any).ticks(theme.nBreaks) : []));

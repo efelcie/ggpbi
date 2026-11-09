@@ -101,6 +101,8 @@ const THEME_OPTION_MAP: Record<string, { prop: string; map: (v: unknown) => unkn
 
 /** Axis display units the pane offers. */
 export const LABEL_UNITS = new Set(['none', 'thousands', 'millions', 'billions']);
+/** Unit naming styles the pane offers. */
+export const UNIT_SUFFIXES = new Set(['short', 'shortSpace', 'locale']);
 
 /** Theme keys the host supplies — present in the code, but never edits. */
 const THEME_HOST_KEYS = new Set(['colorPalette', 'isHighContrast']);
@@ -210,7 +212,7 @@ export function computePaneWriteback(
   // --- scales ---
   const SCALE_PROP: Record<string, string> = {
     type: 'type', labels: 'labelFormat', dateLabels: 'dateFormat',
-    labelUnit: 'labelUnit', labelColor: 'labelColor', dateBreaks: 'dateBreaks', position: 'position',
+    labelUnit: 'labelUnit', unitSuffix: 'unitSuffix', labelColor: 'labelColor', dateBreaks: 'dateBreaks', position: 'position',
   };
   const scalePatch = (axis: 'x' | 'y', objectName: string): void => {
     const cfg = patch.scales?.[axis];
@@ -223,6 +225,7 @@ export function computePaneWriteback(
       else if (key === 'labels' && LABEL_FORMATS.has(value as string)) properties.labelFormat = value;
       else if (key === 'dateLabels' && DATE_FORMATS.has(value as string)) properties.dateFormat = value;
       else if (key === 'labelUnit' && LABEL_UNITS.has(value as string)) properties.labelUnit = value;
+      else if (key === 'unitSuffix' && UNIT_SUFFIXES.has(value as string)) properties.unitSuffix = value;
       else if (key === 'labelColor' && typeof value === 'string') properties.labelColor = fill(value);
       else if (key === 'dateBreaks' && typeof value === 'string') properties.dateBreaks = value;
       else if (key === 'position' && axis === 'y' && (value === 'left' || value === 'right')) properties.position = value;

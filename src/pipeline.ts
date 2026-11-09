@@ -22,6 +22,7 @@ import type { ResolvedTheme } from './theme';
 import { resolveTheme } from './theme';
 import { estimateLegendWidth, type LegendEntry } from './legend';
 import { extendedBreaks, formatBreaksAs } from './breaks';
+import { formatDates } from './format';
 import { describePlot, hasHiddenTransform, fieldLabelsFor, type LayerDescription } from './describe';
 import { shouldWarnAggregated, AGGREGATION_NOTE } from './row-identity';
 import { facetDims, parseRowAxes } from './facet-layout';
@@ -1072,7 +1073,7 @@ export function estimateYTickLabelWidth(
     if (!isFinite(lo) || !isFinite(hi)) return 0;
     if (yCfg.min !== undefined) lo = yCfg.min;
     if (yCfg.max !== undefined) hi = yCfg.max;
-    labels = formatBreaksAs(extendedBreaks(lo, hi, theme.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit });
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme.nBreaks), yCfg.labels, { ...spec.format, unit: yCfg.labelUnit, unitSuffix: yCfg.unitSuffix });
   }
 
   let maxWidth = 0;
@@ -1127,8 +1128,14 @@ export function computeLayout(
         + (xAxis ? theme.axisTextSize + theme.halfLine / 2 : 0)
         + (xTitle ? theme.axisTitleSize + theme.halfLine / 2 : 0),
       );
+    // With the y axis on the right nothing on the left makes room for the
+    // first x label, which is centred on the panel's left edge ("Jan. 2024"
+    // under a time axis): keep half of it inside the plot.
+    const left = yRight
+      ? Math.max(Math.round(theme.halfLine * 2), Math.ceil(estimateXTickLabelWidth(spec, theme) / 2))
+      : side;
     baseMargin = yRight
-      ? { ...theme.margin, left: Math.round(theme.halfLine * 2), right: side, bottom }
+      ? { ...theme.margin, left, right: side, bottom }
       : { ...theme.margin, left: side, bottom };
   }
 
@@ -1147,6 +1154,35 @@ export function computeLayout(
     margin: effectiveMargin,
     yAxisRoom,
   };
+}
+
+/**
+ * Estimated width of the widest x tick label: on a time axis the longest
+ * month label the chosen date format writes in the report locale (a full
+ * year of them), on a numeric axis the formatted breaks. 0 for a category
+ * axis — its first label sits half a band inside the panel.
+ */
+export function estimateXTickLabelWidth(spec: PlotSpec, theme: ResolvedTheme): number {
+  const data = spec.data ?? [];
+  const xField = spec.aes.x;
+  if (!xField || data.length === 0) return 0;
+  const xCfg = parseScaleConfig(spec.scales?.x);
+  const type = normalizeScaleType(xCfg.type, inferScaleType(data, xField), 'x', false);
+  let labels: string[] = [];
+  if (type === 'time') {
+    const year = Array.from({ length: 12 }, (_, m) => new Date(2024, m, 1));
+    const fmt = xCfg.dateLabels && xCfg.dateLabels !== 'auto' ? xCfg.dateLabels : 'monthYear';
+    labels = formatDates(year, fmt, spec.format ?? {});
+  } else if (type === 'linear' || type === 'log' || type === 'sqrt') {
+    const xs = data.map(d => Number(d[xField])).filter(Number.isFinite);
+    if (xs.length === 0) return 0;
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    if (lo === hi) return 0;
+    labels = formatBreaksAs(extendedBreaks(lo, hi, theme.nBreaks), xCfg.labels,
+      { ...spec.format, unit: xCfg.labelUnit, unitSuffix: xCfg.unitSuffix });
+  }
+  return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme.axisTextSize)), 0);
 }
 
 /** A label of only whitespace is ggplot2's `labs(x = NULL)`: no title, no room. */
