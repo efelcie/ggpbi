@@ -398,6 +398,13 @@ const labelUnitSlice = () => new formattingSettings.AutoDropdown({
   value: 'none',
 });
 
+/** How compact labels and display units name the unit (K/M, "7,6 M", "Mio."). */
+const unitSuffixSlice = () => new formattingSettings.AutoDropdown({
+  name: 'unitSuffix',
+  displayName: 'Unit suffix',
+  value: 'short',
+});
+
 /** Tick label colour (ggplot2 axis.text = element_text(colour =)). */
 const labelColorSlice = () => new formattingSettings.ColorPicker({
   name: 'labelColor',
@@ -445,13 +452,14 @@ class ScaleXCard extends formattingSettings.SimpleCard {
   });
 
   labelUnit = labelUnitSlice();
+  unitSuffix = unitSuffixSlice();
   labelColor = labelColorSlice();
   dateBreaks = dateBreaksSlice();
 
   name = 'scaleX';
   displayName = 'X Axis';
   slices: formattingSettings.Slice[] = [
-    this.type, this.label, this.labelFormat, this.labelUnit, this.dateFormat, this.dateBreaks, this.labelColor,
+    this.type, this.label, this.labelFormat, this.labelUnit, this.unitSuffix, this.dateFormat, this.dateBreaks, this.labelColor,
   ];
 }
 
@@ -485,6 +493,7 @@ class ScaleYCard extends formattingSettings.SimpleCard {
   });
 
   labelUnit = labelUnitSlice();
+  unitSuffix = unitSuffixSlice();
   labelColor = labelColorSlice();
   dateBreaks = dateBreaksSlice();
 
@@ -498,7 +507,7 @@ class ScaleYCard extends formattingSettings.SimpleCard {
   name = 'scaleY';
   displayName = 'Y Axis';
   slices: formattingSettings.Slice[] = [
-    this.type, this.label, this.position, this.labelFormat, this.labelUnit, this.dateFormat, this.dateBreaks,
+    this.type, this.label, this.position, this.labelFormat, this.labelUnit, this.unitSuffix, this.dateFormat, this.dateBreaks,
     this.labelColor,
   ];
 }

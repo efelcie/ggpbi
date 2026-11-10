@@ -24,7 +24,7 @@ const GEOM_OPTIONS = [
   'adjust', 'trim', 'notch', 'varwidth', 'naRm',
 ];
 
-const SCALE_KEYS = ['type', 'min', 'max', 'labels', 'dateLabels', 'dateBreaks', 'labelUnit', 'labelColor', 'position'];
+const SCALE_KEYS = ['type', 'min', 'max', 'labels', 'dateLabels', 'dateBreaks', 'labelUnit', 'unitSuffix', 'labelColor', 'position'];
 const FACET_KEYS = ['wrap', 'row', 'col', 'ncol', 'nrow', 'freeX', 'freeY', 'heights', 'strips', 'rowAxes'];
 /** Editable theme keys — the host-owned ones are greyed, not suggested. */
 const THEME_KEYS = ['preset', 'panelFill', 'gridColor', 'ink', 'paper', 'baseSize', 'fontFamily', 'gridX', 'gridY', 'gridMinor', 'ticks'];
@@ -156,7 +156,7 @@ const R_AES_ARGS = [
 const R_NAMED_ARGS = [
   'alpha', 'size', 'colour', 'fill', 'linetype', 'position', 'shape',
   'method', 'se', 'bins', 'binwidth', 'stat', 'ncol', 'nrow', 'scales',
-  'limits', 'labels', 'subtitle', 'trans', 'rows', 'position', 'date_breaks', 'label_unit', 'label_colour', 'strip', 'row_axes',
+  'limits', 'labels', 'subtitle', 'trans', 'rows', 'position', 'date_breaks', 'label_unit', 'unit_suffix', 'label_colour', 'strip', 'row_axes',
 ];
 
 /** A bare R name, backticked for suggestions when R would reject it. */

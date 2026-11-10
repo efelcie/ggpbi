@@ -363,6 +363,7 @@ function mapScale(call: RCall, patch: CodePatch): void {
     if (arg.name === 'date_labels') { cfg.dateLabels = arg.value; continue; }
     if (arg.name === 'date_breaks') { cfg.dateBreaks = arg.value; continue; }
     if (arg.name === 'label_unit') { cfg.labelUnit = arg.value; continue; }
+    if (arg.name === 'unit_suffix') { cfg.unitSuffix = arg.value; continue; }
     if (arg.name === 'label_colour' || arg.name === 'label_color') { cfg.labelColor = arg.value; continue; }
     cfg[arg.name] = arg.value;
   }

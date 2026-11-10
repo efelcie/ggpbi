@@ -41,8 +41,11 @@ describe('fixed display units', () => {
       .toEqual(['5.5M', '6.0M', '6.5M', '7.0M', '7.5M']);
   });
 
-  it('follows the locale', () => {
-    const de = formatInUnit([0, 1.5e9], 'millions', { locale: 'de-DE' }, true)
+  it('takes the locale\'s marks and the chosen unit suffix', () => {
+    expect(formatInUnit([0, 1.5e9], 'millions', { locale: 'de-DE' }, true)).toEqual(['0M', '1.500M']);
+    expect(formatInUnit([0, 1.5e9], 'millions', { locale: 'de-DE', unitSuffix: 'shortSpace' }, true))
+      .toEqual(['0 M', '1.500 M']);
+    const de = formatInUnit([0, 1.5e9], 'millions', { locale: 'de-DE', unitSuffix: 'locale' }, true)
       .map(s => s.replace(/ /g, ' '));
     expect(de).toEqual(['0 Mio.', '1.500 Mio.']);
     // German has no short thousands: the K fallback keeps the unit visible.
@@ -141,7 +144,14 @@ describe('the Mobile charts', () => {
     expect(svg.querySelector('.ggpbi-axis-label-x')).toBeNull();
     expect(svg.querySelector('.ggpbi-axis-label-y')).toBeNull();
     const g = svg.querySelector(':scope > g')!;
-    expect(g.getAttribute('transform')).toBe('translate(14,14)');
+    const [left, top] = g.getAttribute('transform')!.match(/translate\(([\d.]+),([\d.]+)\)/)!.slice(1).map(Number);
+    expect(top).toBe(14);
+    // With the axis on the right, the left margin holds half of the first
+    // x label ("Jan 2024" is centred on the panel edge) — and nothing more.
+    const firstX = svg.querySelector('.ggpbi-axis-x text')!;
+    const half = (firstX.textContent ?? '').length * 14 * 0.8 * 0.6 / 2;
+    expect(left).toBeGreaterThanOrEqual(half);
+    expect(left).toBeLessThan(half + 14);
   });
 
   it('the report font reaches every text', () => {
@@ -310,10 +320,15 @@ describe('direct labels and the reporting month', () => {
 
   const rows = months.map((m, i) => ({ month: m, ltm: 5.4e6 + i * 6.6e4, prior: 6.8e6, pm: 5.6e5 + (i % 5) * 2e4 }));
 
-  it('formats an end value at the axis precision', () => {
-    const ticks = [5.5e6, 6e6, 6.5e6, 7e6, 7.5e6];
-    expect(formatLikeAxis(7_531_234, ticks, 'compact', EN)).toBe('7.5M');
-    expect(formatLikeAxis(1_828_000_000, [0, 5e8, 1e9, 1.5e9], 'thousands', { ...EN, unit: 'millions' })).toBe('1,800M');
+  it('formats an end value one digit finer than the axis', () => {
+    // E: whole-million axis, the line ends at 7.62 M — not "8M".
+    expect(formatLikeAxis(7_620_000, [4e6, 5e6, 6e6, 7e6], 'compact', EN)).toBe('7.6M');
+    expect(formatLikeAxis(7_620_000, [4e6, 5e6, 6e6, 7e6], 'compact', { locale: 'de-DE', unitSuffix: 'shortSpace' }))
+      .toBe('7,6 M');
+    // F: whole-percent axis, the line ends at 96.5 % — not "97%".
+    expect(formatLikeAxis(0.965, [0.95, 0.96, 0.97, 0.98, 0.99, 1], 'percent', EN)).toBe('96.5%');
+    expect(formatLikeAxis(7_531_234, [5.5e6, 6e6, 6.5e6, 7e6, 7.5e6], 'compact', EN)).toBe('7.53M');
+    expect(formatLikeAxis(1_828_000_000, [0, 5e8, 1e9, 1.5e9], 'thousands', { ...EN, unit: 'millions' })).toBe('1,830M');
   });
 
   it('a dot and the value at the end of the line, the reference named on its line', () => {
@@ -330,7 +345,7 @@ describe('direct labels and the reporting month', () => {
     const dot = svg.querySelector('.ggpbi-end-point')!;
     expect(dot.getAttribute('fill')).toBe('#416B84');
     const labels = Array.from(svg.querySelectorAll('.ggpbi-end-label'));
-    expect(labels.map(l => l.textContent)).toEqual(['7.5M', 'Prior year']);
+    expect(labels.map(l => l.textContent)).toEqual(['7.51M', 'Prior year']);
     expect(labels.map(l => l.getAttribute('fill'))).toEqual(['#416B84', '#8A8886']);
     // The dot sits on the last point, the label ends there.
     expect(labels[0].getAttribute('x')).toBe(dot.getAttribute('cx'));
@@ -371,5 +386,124 @@ describe('direct labels and the reporting month', () => {
     expect(svg!.querySelector('.ggpbi-end-label')?.textContent).toMatch(/M$/);
     const fills = Array.from(svg!.querySelectorAll('.ggpbi-bar')).map(b => b.getAttribute('fill'));
     expect(fills.filter(f => f === '#416B84')).toHaveLength(1);
+  });
+});
+
+describe('end labels keep off the lines', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  /** Pixel polylines of every line path in the svg (d3.line: M…L…). */
+  const polylines = (svg: SVGSVGElement): Array<Array<[number, number]>> =>
+    Array.from(svg.querySelectorAll('.ggpbi-layer-line path, .ggpbi-area-outline')).map(p => {
+      const nums = (p.getAttribute('d') ?? '').match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g)!.map(Number);
+      const pts: Array<[number, number]> = [];
+      for (let i = 0; i + 1 < nums.length; i += 2) pts.push([nums[i], nums[i + 1]]);
+      return pts;
+    });
+
+  /** The label's box as drawn: anchored at its end, baseline 0.2 em above the bottom. */
+  const labelBox = (t: Element) => {
+    const fs = parseFloat(t.getAttribute('font-size')!);
+    const x1 = parseFloat(t.getAttribute('x')!);
+    const y1 = parseFloat(t.getAttribute('y')!) + fs * 0.2;
+    const w = (t.textContent ?? '').length * fs * 0.58;
+    return { x0: x1 - w, x1, y0: y1 - fs, y1 };
+  };
+
+  const crosses = (b: { x0: number; x1: number; y0: number; y1: number }, line: Array<[number, number]>) =>
+    line.some(([ax, ay], i) => {
+      if (i === 0) return false;
+      const [bx, by] = line[i - 1];
+      // Sample the segment: fine enough for a test.
+      for (let k = 0; k <= 20; k++) {
+        const x = ax + (bx - ax) * (k / 20);
+        const y = ay + (by - ay) * (k / 20);
+        if (x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1) return true;
+      }
+      return false;
+    });
+
+  it('F: a steep drop at the end — the label finds room beside it', () => {
+    const occ = months.map((m, i) => ({ month: m, occ: i < 32 ? 1 : 0.965 }));
+    const svg = ggpbi()
+      .data(occ)
+      .aes({ x: 'month', y: 'occ' })
+      .geom('line', { color: '#416B84', size: 2, endPoint: true, endLabel: true } as any)
+      .scale({ y: { position: 'right', labels: 'percent' } } as any)
+      .format(EN)
+      .size(440, 200)
+      .renderTo(container);
+    const label = svg.querySelector('.ggpbi-end-label')!;
+    expect(label.textContent).toBe('96.5%');
+    for (const line of polylines(svg)) expect(crosses(labelBox(label), line)).toBe(false);
+  });
+
+  it('E: the value and "Prior year" do not sit on each other or on a line', () => {
+    const rows = months.map((m, i) => ({ month: m, ltm: 4.2e6 + i * 1.07e5, prior: 7.45e6 }));
+    const svg = ggpbi()
+      .data(rows)
+      .aes({ x: 'month', y: 'ltm' })
+      .layer({ geom: { type: 'line', color: '#416B84', size: 2, endPoint: true, endLabel: true }, aes: { y: 'ltm' } } as any)
+      .layer({ geom: { type: 'line', color: '#8A8886', linetype: 'dashed', endLabel: true, labelTemplate: 'Prior year' }, aes: { y: 'prior' } } as any)
+      .scale({ y: { position: 'right', labels: 'compact', unitSuffix: 'shortSpace' } } as any)
+      .format({ locale: 'de-DE' })
+      .size(440, 220)
+      .renderTo(container);
+    const [value, prior] = Array.from(svg.querySelectorAll('.ggpbi-end-label'));
+    expect(value.textContent).toBe('7,6 M');
+    expect(prior.textContent).toBe('Prior year');
+    const a = labelBox(value);
+    const b = labelBox(prior);
+    expect(a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0).toBe(false);
+    for (const line of polylines(svg)) {
+      expect(crosses(a, line)).toBe(false);
+      expect(crosses(b, line)).toBe(false);
+    }
+  });
+});
+
+describe('unit suffix through every door', () => {
+  it('the R code view writes unit_suffix and reads it back', () => {
+    const spec = {
+      data: [{ x: 1, y: 2 }],
+      aes: { x: 'x', y: 'y' },
+      layers: [{ geom: { type: 'line' as const } }],
+      scales: { y: { labels: 'compact', unitSuffix: 'shortSpace' } },
+    } as PlotSpec;
+    const code = specToR(spec, {});
+    expect(code).toContain('unit_suffix = "shortSpace"');
+    const parsed = parseR(code);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok !== true) return;
+    expect(parsed.patch.scales?.y).toEqual({ labels: 'compact', unitSuffix: 'shortSpace' });
+  });
+
+  it('an editor edit writes the suffix back to the pane', () => {
+    const parsed = parseCode("ggpbi()\n  .aes({ x: 'x', y: 'y' })\n  .geom('line')\n  .scale({ y: { unitSuffix: 'locale' } })\n  .renderTo(element);");
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok !== true) return;
+    const live = { data: [{ x: 1, y: 2 }], aes: { x: 'x', y: 'y' }, layers: [{ geom: { type: 'line' } }] } as PlotSpec;
+    const result = computePaneWriteback(parsed.patch, live, applyCodeEdit(live, parsed.patch), {});
+    expect(result.instances.find(i => i.objectName === 'scaleY')?.properties).toEqual({ unitSuffix: 'locale' });
+  });
+
+  it('the Power BI visual: German phone, report-style "7,6 M"', () => {
+    const { container } = renderVisual({
+      locale: 'de-DE',
+      categories: [{ name: 'Month End', role: 'x', values: months }],
+      measures: [{ name: 'LTM', values: months.map((_, i) => 4.2e6 + i * 1.07e5) }],
+      objects: {
+        layer1: { enabled: true, type: 'line', endLabel: true },
+        scaleY: { labelFormat: 'compact', unitSuffix: 'shortSpace' },
+      },
+    });
+    const svg = container.querySelector('svg')!;
+    const ticks = Array.from(svg.querySelectorAll('.ggpbi-axis-y text')).map(t => t.textContent);
+    expect(ticks.every(t => /^\d+(,\d)? M$/.test(t ?? ''))).toBe(true);
+    expect(svg.querySelector('.ggpbi-end-label')?.textContent).toBe('7,6 M');
   });
 });

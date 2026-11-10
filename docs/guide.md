@@ -1555,6 +1555,19 @@ label. `compact` picks the unit per value and the decimals per unit, as
 range; `0, 500K, 1.0M, 1.5M` across a unit boundary. Unlike scales it never
 rounds a lone break in its unit away (`0, 2.5M`, not `0, 2M`).
 
+The unit letters are ggplot2's too: K, M, B, T, whatever the report
+language. `unitSuffix` picks another naming, per axis:
+
+| `unitSuffix` | German report | Like |
+|--------------|---------------|------|
+| `'short'` (default) | `7,6M` | `scales::cut_short_scale()` |
+| `'shortSpace'` | `7,6 M` | a Power BI format string `#,0,,.0 M` |
+| `'locale'` | `7,6 Mio.` | the language's own word (`Intl` compact) |
+
+```typescript
+.scale({ y: { labels: 'compact', unitSuffix: 'shortSpace' } })   // "7,6 M" in German
+```
+
 #### Locale
 
 Every format goes through `Intl`, so the **report language decides** the
@@ -1565,7 +1578,7 @@ placement:
 |--------|---------|---------|
 | `auto` | `1234.5` | `1234,5` |
 | `thousands` | `1,200,000` | `1.200.000` |
-| `compact` | `1.2M` | `1,2 Mio.` |
+| `compact` | `1.2M` | `1,2M` (`unitSuffix: 'locale'`: `1,2 Mio.`) |
 | `currency` (EUR) | `€1,000` | `1.000 €` |
 
 In Power BI the locale comes from the host automatically — nothing to
@@ -1729,7 +1742,8 @@ reads as one report.
 `labelUnit` divides every label by one unit — `0M, 500M, 1,000M, 1,500M`
 — where `compact` picks a unit per value (`500M, 1.0B, 1.5B`). It applies
 to the `auto` and `thousands` formats; with `thousands` the digits group.
-The suffix follows the locale ("Mio." in German). A blank title (`' '`)
+The letter follows `unitSuffix` like `compact` does: "1.500M", "1.500 M"
+or "1.500 Mio." in German. A blank title (`' '`)
 takes no room, so the panel reaches the plot margin. An area layer with a
 `size` draws its upper edge as a line in the layer colour — `alpha` thins
 the fill only, as in ggplot2 — so a shaded LTM line is one layer. Dash
@@ -1786,10 +1800,14 @@ legend:
 | `endLabel: true` | line, area | `geom_text(data = ~ slice_max(.x, month), aes(label = …))` |
 | `lastFill: '#416B84'` | bar | `aes(fill = month == max(month))` + `scale_fill_manual()` |
 
-The end label shows the last value as the y axis prints it ("7.5M"), or
-the `labelTemplate` text when one is set — `'Prior year'` names a dashed
-reference line in place. It sits above a rising line and below a falling
-one, and steps aside for another end label. `lastFill` colours the last
+The end label shows the last value in the y axis's format and unit, one
+digit finer than the axis — the axis reads `4M … 7M`, the end `7.6M`;
+`95% … 100%` and `96.5%`. With a `labelTemplate` it shows that text
+instead — `'Prior year'` names a dashed reference line in place. The label
+takes the first free spot around its point (above, below, beside, one line
+further out), free meaning no line of the panel and no other end label runs
+through it; when another line crosses every spot at the end, it slides
+left along its own line. `lastFill` colours the last
 bar along the axis: the reporting month among the monthly columns.
 
 ```typescript
