@@ -342,7 +342,7 @@ export function resolveLabelBinding(
  * column is remapped to a synthetic key (raw Y → yRaw1, Detail → 'detail')
  * but ANOTHER role binds the same column by its display name (Color, Facet,
  * a shared Label), that aesthetic would point at a field that no longer
- * exists ("Branche in Y and Color" crashed the visual). Copy the value back
+ * exists ("Category in Y and Color" crashed the visual). Copy the value back
  * under the display name so both bindings see real data.
  */
 export function restoreSharedFieldAliases(

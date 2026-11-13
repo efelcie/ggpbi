@@ -317,7 +317,7 @@ export interface TextGeomConfig extends BaseGeomConfig {
   /**
    * Template for the label text. `{label}`, `{x}` and `{y}` are replaced
    * with the row's bound values; a d3-format spec after a colon formats
-   * numeric values, e.g. '{label} {x:.1%}' → "SPAR 8.5%". Default: the
+   * numeric values, e.g. '{label} {x:.1%}' → "Swift 8.5%". Default: the
    * label aesthetic as-is.
    */
   labelTemplate?: string;

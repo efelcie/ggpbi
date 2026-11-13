@@ -172,11 +172,11 @@ describe('fromDataView', () => {
     const dv: DataView = {
       categorical: {
         categories: [{
-          source: { displayName: 'Branche' },
-          values: ['Retail', 'Health'],
+          source: { displayName: 'Category' },
+          values: ['Outdoor', 'Office'],
         }],
         values: Object.assign([{
-          source: { displayName: 'OCR', roles: { x: true } },
+          source: { displayName: 'Share', roles: { x: true } },
           values: [0.82, 0.67],
         }]) as DataViewValueColumns,
       },
@@ -184,8 +184,8 @@ describe('fromDataView', () => {
 
     const data = fromDataView(dv, { roleMapping: DEFAULT_ROLE_MAPPING, numberedRoles: NUMBERED_ROLES });
     expect(data).toHaveLength(2);
-    expect(data[0]).toEqual({ Branche: 'Retail', x: 0.82 });
-    expect(data[1]).toEqual({ Branche: 'Health', x: 0.67 });
+    expect(data[0]).toEqual({ Category: 'Outdoor', x: 0.82 });
+    expect(data[1]).toEqual({ Category: 'Office', x: 0.67 });
   });
 
   it('keeps detail category for row-level strip plot identity', () => {
@@ -193,8 +193,8 @@ describe('fromDataView', () => {
       categorical: {
         categories: [
           {
-            source: { displayName: 'Branche' },
-            values: ['Retail', 'Retail', 'Health'],
+            source: { displayName: 'Category' },
+            values: ['Outdoor', 'Outdoor', 'Office'],
           },
           {
             source: { displayName: 'Document ID' },
@@ -202,7 +202,7 @@ describe('fromDataView', () => {
           },
         ],
         values: Object.assign([{
-          source: { displayName: 'OCR', roles: { x: true } },
+          source: { displayName: 'Share', roles: { x: true } },
           values: [0.82, 0.91, 0.67],
         }]) as DataViewValueColumns,
       },
@@ -215,9 +215,9 @@ describe('fromDataView', () => {
     });
 
     expect(data).toHaveLength(3);
-    expect(data[0]).toEqual({ Branche: 'Retail', detail: 'doc-1', x: 0.82 });
-    expect(data[1]).toEqual({ Branche: 'Retail', detail: 'doc-2', x: 0.91 });
-    expect(data[2]).toEqual({ Branche: 'Health', detail: 'doc-3', x: 0.67 });
+    expect(data[0]).toEqual({ Category: 'Outdoor', detail: 'doc-1', x: 0.82 });
+    expect(data[1]).toEqual({ Category: 'Outdoor', detail: 'doc-2', x: 0.91 });
+    expect(data[2]).toEqual({ Category: 'Office', detail: 'doc-3', x: 0.67 });
   });
 
   it('maps two Y fields to y1 and y2 via numberedRoles', () => {
@@ -266,11 +266,11 @@ describe('fromDataView', () => {
     const dv: DataView = {
       categorical: {
         categories: [{
-          source: { displayName: 'Branche' },
-          values: ['Retail', 'Health'],
+          source: { displayName: 'Category' },
+          values: ['Outdoor', 'Office'],
         }],
         values: Object.assign([
-          { source: { displayName: 'OCR', roles: { x: true } }, values: [0.82, 0.67] },
+          { source: { displayName: 'Share', roles: { x: true } }, values: [0.82, 0.67] },
           { source: { displayName: 'Firma', roles: { label: true } }, values: ['Alpha GmbH', 'Beta AG'] },
         ]) as DataViewValueColumns,
       },
@@ -278,8 +278,8 @@ describe('fromDataView', () => {
 
     const data = fromDataView(dv, { roleMapping: DEFAULT_ROLE_MAPPING, numberedRoles: NUMBERED_ROLES });
     expect(data).toHaveLength(2);
-    expect(data[0]).toEqual({ Branche: 'Retail', x: 0.82, label: 'Alpha GmbH' });
-    expect(data[1]).toEqual({ Branche: 'Health', x: 0.67, label: 'Beta AG' });
+    expect(data[0]).toEqual({ Category: 'Outdoor', x: 0.82, label: 'Alpha GmbH' });
+    expect(data[1]).toEqual({ Category: 'Office', x: 0.67, label: 'Beta AG' });
   });
 
   it('falls back to displayName when role has no roleMapping entry', () => {
@@ -567,25 +567,25 @@ describe('resolveLabelBinding (shared Label column)', () => {
 
 describe('restoreSharedFieldAliases (dual-role category columns)', () => {
   it('copies a remapped raw-Y column back under its display name for Color', () => {
-    // "Branche" dragged into Y (raw category → yRaw1) AND Color.
+    // "Category" dragged into Y (raw category → yRaw1) AND Color.
     const rows = [
-      { x: 0.1, yRaw1: 'Retail' },
-      { x: 0.2, yRaw1: 'Grocery' },
+      { x: 0.1, yRaw1: 'Outdoor' },
+      { x: 0.2, yRaw1: 'Kitchen' },
     ];
-    restoreSharedFieldAliases(rows, { Branche: 'yRaw1' }, ['Branche', undefined, undefined]);
-    expect(rows[0].Branche).toBe('Retail');
-    expect(rows[1].Branche).toBe('Grocery');
+    restoreSharedFieldAliases(rows, { Category: 'yRaw1' }, ['Category', undefined, undefined]);
+    expect(rows[0].Category).toBe('Outdoor');
+    expect(rows[1].Category).toBe('Kitchen');
   });
 
   it('handles Detail-remapped columns and multiple bound names', () => {
-    const rows = [{ detail: 'SPAR', yRaw1: 'Grocery' }];
+    const rows = [{ detail: 'Swift', yRaw1: 'Kitchen' }];
     restoreSharedFieldAliases(
       rows,
-      { Mieter: 'detail', Branche: 'yRaw1' },
-      ['Branche', 'Branche', 'Mieter'],
+      { Product: 'detail', Category: 'yRaw1' },
+      ['Category', 'Category', 'Product'],
     );
-    expect((rows[0] as any).Mieter).toBe('SPAR');
-    expect((rows[0] as any).Branche).toBe('Grocery');
+    expect((rows[0] as any).Product).toBe('Swift');
+    expect((rows[0] as any).Category).toBe('Kitchen');
   });
 
   it('leaves rows untouched when no bound name was remapped', () => {
@@ -594,31 +594,31 @@ describe('restoreSharedFieldAliases (dual-role category columns)', () => {
     expect(rows[0]).toEqual({ x: 1, color: 'a' });
   });
 
-  it('end to end: colour aesthetic binds after aliasing (the Branche crash)', () => {
+  it('end to end: colour aesthetic binds after aliasing (the Category crash)', () => {
     const dataView: DataView = {
       categorical: {
         categories: [
-          { source: { displayName: 'Branche' }, values: ['Retail', 'Grocery', 'Retail'] },
+          { source: { displayName: 'Category' }, values: ['Outdoor', 'Kitchen', 'Outdoor'] },
         ],
         values: [
           {
-            source: { displayName: 'OCR', roles: { x: true } },
-            values: [0.35, 0.09, 0.08],
+            source: { displayName: 'Share', roles: { x: true } },
+            values: [0.33, 0.07, 0.06],
           },
         ] as unknown as DataViewValueColumns,
       },
     };
     const rows = fromDataView(dataView, {
-      fieldMapping: { Branche: 'yRaw1' },
+      fieldMapping: { Category: 'yRaw1' },
       roleMapping: DEFAULT_ROLE_MAPPING,
       numberedRoles: NUMBERED_ROLES,
     });
     // Before aliasing: the display name is gone — aes.color would dangle.
-    expect(rows[0].Branche).toBeUndefined();
-    restoreSharedFieldAliases(rows, { Branche: 'yRaw1' }, ['Branche']);
-    expect(rows.map(r => r.Branche)).toEqual(['Retail', 'Grocery', 'Retail']);
-    expect(rows.map(r => r.yRaw1)).toEqual(['Retail', 'Grocery', 'Retail']);
-    expect(rows.map(r => r.x)).toEqual([0.35, 0.09, 0.08]);
+    expect(rows[0].Category).toBeUndefined();
+    restoreSharedFieldAliases(rows, { Category: 'yRaw1' }, ['Category']);
+    expect(rows.map(r => r.Category)).toEqual(['Outdoor', 'Kitchen', 'Outdoor']);
+    expect(rows.map(r => r.yRaw1)).toEqual(['Outdoor', 'Kitchen', 'Outdoor']);
+    expect(rows.map(r => r.x)).toEqual([0.33, 0.07, 0.06]);
   });
 });
 

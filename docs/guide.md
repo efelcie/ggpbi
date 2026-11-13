@@ -297,7 +297,7 @@ ggpbi detects the best chart type based on the assigned fields:
 **Scatter mode:** As soon as a field is dragged to **X Axis**, the visual
 automatically switches to scatter mode. X can be a measure or a category.
 If the other axis is categorical, ggpbi renders a strip plot (for example
-`X = OCR`, `Y = Branche`). Use the **Detail** bucket for the row/item identity
+`X = Share`, `Y = Category`). Use the **Detail** bucket for the row/item identity
 that defines one point (for example customer, document, company, or record ID).
 Without Detail, Power BI aggregates the measure per category — one row per
 group, which auto-renders as horizontal value bars; add a Detail field to get
@@ -453,7 +453,7 @@ All parameters match ggplot2 `geom_point()`:
 // Horizontal strip plot (numeric X, categorical Y)
 ggpbi()
   .data(records)
-  .aes({ x: 'ocr', y: 'branche', group: 'documentId' })
+  .aes({ x: 'share', y: 'category', group: 'documentId' })
   .geom('point', { position: 'jitter', jitterWidth: 0, jitterHeight: 0.35 })
   .renderTo(el);
 
@@ -470,8 +470,8 @@ For one point per entity with a measure on the X axis:
 
 | Bucket | Field |
 |--------|-------|
-| X | OCR measure |
-| Y | Branche |
+| X | Share measure |
+| Y | Category |
 | Detail | Row identity, e.g. document/customer/company ID |
 | Label | Optional label text for selected points |
 
@@ -817,7 +817,7 @@ annotation easy: fill the label field only for the points that should be named.
 | `vjust` | `vjust = "inward"` | — | `'inward'`: upper-half labels go below their point, lower-half above (overrides `dy`) |
 | `checkOverlap` | `check_overlap` | `false` | Hide labels that would overlap an earlier label; first in data order wins |
 | `repel` | ggrepel `geom_text_repel` | `false` | Labels find their own non-overlapping spots (greedy ring search around each point); displaced labels get a thin connector line. Supersedes `hjust`/`vjust`/`checkOverlap`. **When space runs out, labels that find no free spot are hidden** (like ggrepel's `max.overlaps` — a console warning reports the count); above 250 labels the search degrades to first-wins hiding. Power BI: **Repel labels** toggle in the layer's Position & Layout group |
-| `labelTemplate` | `aes(label = paste(...))` | — | Template for the label text, e.g. `'{label} {x:.1%}'` → `"SPAR 8.5%"`. Placeholders `{label}`, `{x}`, `{y}` take the row's bound values; an optional [d3-format](https://d3js.org/d3-format) spec after the colon formats numbers. Power BI: **Label template** input in the layer's Position & Layout group |
+| `labelTemplate` | `aes(label = paste(...))` | — | Template for the label text, e.g. `'{label} {x:.1%}'` → `"Swift 8.5%"`. Placeholders `{label}`, `{x}`, `{y}` take the row's bound values; an optional [d3-format](https://d3js.org/d3-format) spec after the colon formats numbers. Power BI: **Label template** input in the layer's Position & Layout group |
 | `angle` | `angle` | 0 | Rotation in degrees |
 | `fontFamily` | `family` | `'sans-serif'` | Font family |
 | `naRm` | `na.rm` | `false` | Silently remove NA values |
@@ -1276,8 +1276,8 @@ from **pre-aggregated data** ([gallery](gallery.md#dumbbell-from-pre-aggregated-
 ```typescript
 // One row per group with lo/hi columns (in Power BI: DAX measures)
 ggpbi()
-  .data(stats) // { branche, lo, hi }
-  .aes({ x: 'lo', y: 'branche', xend: 'hi' })
+  .data(stats) // { category, lo, hi }
+  .aes({ x: 'lo', y: 'category', xend: 'hi' })
   .geom('segment', { color: '#C8D0D9', size: 2 })
   .geom('point', { size: 5 })                      // dot at lo
   .geom('point', { aes: { x: 'hi' }, size: 5 })    // dot at hi
@@ -1346,8 +1346,8 @@ tied to the drawn geometry (count, bin, boxplot, density, smooth) live in
 the visual like ggplot2 stats.** For a DAX-first dumbbell compute per group
 
 ```dax
-Best OCR  = MINX ( VALUES ( Mieter[Name] ), [OCR %] )
-Worst OCR = MAXX ( VALUES ( Mieter[Name] ), [OCR %] )
+Lowest share  = MINX ( VALUES ( Product[Name] ), [Share %] )
+Highest share = MAXX ( VALUES ( Product[Name] ), [Share %] )
 ```
 
 and connect the two measures with a `segment` layer — the filter-based
@@ -1391,11 +1391,11 @@ The classic use is a **dumbbell chart** — best and worst value per category
 
 ```typescript
 ggpbi()
-  .data(ocr) // { branche, tenant, ocr } — many tenants per branche
-  .aes({ x: 'ocr', y: 'branche', label: 'tenant' })
+  .data(shares) // { category, product, share } — many products per category
+  .aes({ x: 'share', y: 'category', label: 'product' })
   .geom('line', { color: '#C8D0D9', size: 2 })                    // segment min → max
-  .geom('point', { filter: 'min', color: '#4E79A7', size: 5 })    // best
-  .geom('point', { filter: 'max', color: '#F28E2B', size: 5 })    // worst
+  .geom('point', { filter: 'min', color: '#4E79A7', size: 5 })    // lowest
+  .geom('point', { filter: 'max', color: '#F28E2B', size: 5 })    // highest
   .geom('text', { filter: 'min', repel: true, color: '#4E79A7', labelTemplate: '{label} {x:.1%}' })
   .geom('text', { filter: 'max', repel: true, color: '#F28E2B', labelTemplate: '{label} {x:.1%}' })
   .scale({ x: { labels: 'percent' } })
@@ -1973,7 +1973,7 @@ layer's Position & Layout group.
 both Color and Label works — the converter binds the label to the shared
 field instead of stealing it from the colour role. The same goes for a
 column that serves Y (raw, "Don't summarize") or Detail **and** Color,
-Facet or Label at the same time (e.g. `Branche` in Y and Color): the
+Facet or Label at the same time (e.g. `Category` in Y and Color): the
 converter restores the shared column under both names so every role
 binds to real data.
 

@@ -123,11 +123,11 @@ describe('always render: solo measure in X (horizontal value bar)', () => {
   });
 
   it('value in X + grouping in Y: auto gives horizontal bars, bar flips itself', () => {
-    // "Reported Sales by ShopName": one value per shop.
+    // Sales by shop: one value per shop (invented names).
     const rows = [
-      { sales: 120, shop: 'SPAR' },
-      { sales: 90, shop: 'dm' },
-      { sales: 45, shop: 'Mercator' },
+      { sales: 120, shop: 'Shop A' },
+      { sales: 90, shop: 'Shop B' },
+      { sales: 45, shop: 'Shop C' },
     ];
     expect(inferGeom(rows as any, { x: 'sales', y: 'shop' }))
       .toEqual({ type: 'bar', orientation: 'y' });
