@@ -396,7 +396,7 @@ export class Visual implements IVisual {
 
       // Same column in Color/Facet/Label AND a remapped role (raw Y, Detail):
       // restore the display name as an alias so those aesthetics still bind
-      // ("Branche in Y and Color" must colour by Branche, not crash).
+      // ("Category in Y and Color" must colour by Category, not crash).
       restoreSharedFieldAliases(data, catFieldMapping, [
         colorFieldName,
         facetFieldName,

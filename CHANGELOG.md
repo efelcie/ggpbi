@@ -339,7 +339,7 @@
 - Added a Power BI **Detail** field well to define row/item identity for strip plots.
 - Mapped X-axis measures correctly so visuals can use `X = measure`, `Y = category`.
 - Centered and jittered points correctly on categorical Y bands for horizontal strip plots.
-- Documented the Power BI strip plot setup (`X = OCR`, `Y = Branche`, `Detail = item ID`).
+- Documented the Power BI strip plot setup (`X = measure`, `Y = category`, `Detail = item ID`).
 - Bumped the package and Power BI visual metadata to `0.2.30`.
 
 ## 2026-08-01 - v0.2.29

@@ -39392,7 +39392,8 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
     const bottom2 = xTitle && xAxis ? theme2.margin.bottom : Math.round(
       theme2.halfLine * 2 + (xAxis ? theme2.axisTextSize + theme2.halfLine / 2 : 0) + (xTitle ? theme2.axisTitleSize + theme2.halfLine / 2 : 0)
     );
-    baseMargin = yRight ? { ...theme2.margin, left: Math.round(theme2.halfLine * 2), right: side, bottom: bottom2 } : { ...theme2.margin, left: side, bottom: bottom2 };
+    const left2 = yRight ? Math.max(Math.round(theme2.halfLine * 2), Math.ceil(estimateXTickLabelWidth(spec, theme2) / 2)) : side;
+    baseMargin = yRight ? { ...theme2.margin, left: left2, right: side, bottom: bottom2 } : { ...theme2.margin, left: side, bottom: bottom2 };
   }
   const effectiveMargin = {
     ...baseMargin,
@@ -39408,6 +39409,31 @@ function computeLayout(spec, theme2, legendWidth, margin, hasSubtitle) {
     margin: effectiveMargin,
     yAxisRoom
   };
+}
+function estimateXTickLabelWidth(spec, theme2) {
+  const data = spec.data ?? [];
+  const xField = spec.aes.x;
+  if (!xField || data.length === 0) return 0;
+  const xCfg = parseScaleConfig(spec.scales?.x);
+  const type2 = normalizeScaleType(xCfg.type, inferScaleType(data, xField), "x", false);
+  let labels = [];
+  if (type2 === "time") {
+    const year = Array.from({ length: 12 }, (_, m) => new Date(2024, m, 1));
+    const fmt = xCfg.dateLabels && xCfg.dateLabels !== "auto" ? xCfg.dateLabels : "monthYear";
+    labels = formatDates(year, fmt, spec.format ?? {});
+  } else if (type2 === "linear" || type2 === "log" || type2 === "sqrt") {
+    const xs = data.map((d) => Number(d[xField])).filter(Number.isFinite);
+    if (xs.length === 0) return 0;
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    if (lo === hi) return 0;
+    labels = formatBreaksAs(
+      extendedBreaks(lo, hi, theme2.nBreaks),
+      xCfg.labels,
+      { ...spec.format, unit: xCfg.labelUnit, unitSuffix: xCfg.unitSuffix }
+    );
+  }
+  return labels.reduce((w, l) => Math.max(w, estimateTextWidth(l, theme2.axisTextSize)), 0);
 }
 function isBlankLabel(label) {
   return label !== void 0 && label.trim() === "";

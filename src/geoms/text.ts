@@ -5,7 +5,7 @@ import type { TextNode, LineNode, NodeStyle, PanelSharedState } from '../scene-t
 import { bandOffset, filterNA } from './util';
 
 /**
- * Render a labelTemplate: '{label} {x:.1%}' → "SPAR 8.5%". Placeholders
+ * Render a labelTemplate: '{label} {x:.1%}' → "Swift 8.5%". Placeholders
  * {label}, {x}, {y} take the row's bound values; an optional d3-format
  * spec after the colon formats numeric values.
  */

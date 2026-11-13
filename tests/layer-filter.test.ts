@@ -8,39 +8,40 @@ import { applyLayerFilter } from '../src/pipeline';
 import { renderLabelTemplate, textToScene } from '../src/geoms/text';
 import type { PanelSharedState } from '../src/scene-types';
 
-const ocr = [
-  { branche: 'Retail', tenant: 'Kik', ocr: 0.35 },
-  { branche: 'Retail', tenant: 'Pepco', ocr: 0.08 },
-  { branche: 'Retail', tenant: 'TEDi', ocr: 0.14 },
-  { branche: 'Grocery', tenant: 'SPAR', ocr: 0.09 },
-  { branche: 'Grocery', tenant: 'Hofer', ocr: 0.04 },
+// Invented sample data: products (bird names) with a share per category.
+const shares = [
+  { category: 'Outdoor', product: 'Kestrel', share: 0.33 },
+  { category: 'Outdoor', product: 'Puffin', share: 0.06 },
+  { category: 'Outdoor', product: 'Tern', share: 0.15 },
+  { category: 'Kitchen', product: 'Swift', share: 0.07 },
+  { category: 'Kitchen', product: 'Heron', share: 0.03 },
 ];
 
 describe('applyLayerFilter (pure)', () => {
-  const aes = { x: 'ocr', y: 'branche' };
+  const aes = { x: 'share', y: 'category' };
 
   it('no filter returns the same array', () => {
-    expect(applyLayerFilter(ocr, { type: 'point' } as any, aes)).toBe(ocr);
+    expect(applyLayerFilter(shares, { type: 'point' } as any, aes)).toBe(shares);
   });
 
   it('function filter keeps matching rows', () => {
-    const out = applyLayerFilter(ocr, { type: 'point', filter: (d: any) => d.ocr > 0.1 } as any, aes);
-    expect(out.map(d => d.tenant)).toEqual(['Kik', 'TEDi']);
+    const out = applyLayerFilter(shares, { type: 'point', filter: (d: any) => d.share > 0.1 } as any, aes);
+    expect(out.map(d => d.product)).toEqual(['Kestrel', 'Tern']);
   });
 
   it("'min' keeps the lowest row per discrete-y group", () => {
-    const out = applyLayerFilter(ocr, { type: 'point', filter: 'min' } as any, aes);
-    expect(out.map(d => d.tenant).sort()).toEqual(['Hofer', 'Pepco']);
+    const out = applyLayerFilter(shares, { type: 'point', filter: 'min' } as any, aes);
+    expect(out.map(d => d.product).sort()).toEqual(['Heron', 'Puffin']);
   });
 
   it("'max' keeps the highest row per discrete-y group", () => {
-    const out = applyLayerFilter(ocr, { type: 'point', filter: 'max' } as any, aes);
-    expect(out.map(d => d.tenant).sort()).toEqual(['Kik', 'SPAR']);
+    const out = applyLayerFilter(shares, { type: 'point', filter: 'max' } as any, aes);
+    expect(out.map(d => d.product).sort()).toEqual(['Kestrel', 'Swift']);
   });
 
   it("'extremes' keeps both ends per group", () => {
-    const out = applyLayerFilter(ocr, { type: 'point', filter: 'extremes' } as any, aes);
-    expect(out.map(d => d.tenant).sort()).toEqual(['Hofer', 'Kik', 'Pepco', 'SPAR']);
+    const out = applyLayerFilter(shares, { type: 'point', filter: 'extremes' } as any, aes);
+    expect(out.map(d => d.product).sort()).toEqual(['Heron', 'Kestrel', 'Puffin', 'Swift']);
   });
 
   it('vertical orientation: discrete x groups, extremes on y', () => {
@@ -83,14 +84,14 @@ describe('applyLayerFilter (pure)', () => {
 });
 
 describe('renderLabelTemplate', () => {
-  const bp: any = { label: 'SPAR', x: 0.085, y: 'Grocery' };
+  const bp: any = { label: 'Swift', x: 0.085, y: 'Kitchen' };
 
   it('substitutes label, x and y', () => {
-    expect(renderLabelTemplate('{label}: {y}', bp)).toBe('SPAR: Grocery');
+    expect(renderLabelTemplate('{label}: {y}', bp)).toBe('Swift: Kitchen');
   });
 
   it('formats numbers with a d3-format spec', () => {
-    expect(renderLabelTemplate('{label} {x:.1%}', bp)).toBe('SPAR 8.5%');
+    expect(renderLabelTemplate('{label} {x:.1%}', bp)).toBe('Swift 8.5%');
   });
 
   it('missing values become empty strings', () => {
@@ -102,7 +103,7 @@ describe('renderLabelTemplate', () => {
   });
 
   it('format specs are ignored for non-numeric values', () => {
-    expect(renderLabelTemplate('{y:.1%}', bp)).toBe('Grocery');
+    expect(renderLabelTemplate('{y:.1%}', bp)).toBe('Kitchen');
   });
 });
 
@@ -154,8 +155,8 @@ describe('dumbbell chart end to end', () => {
 
   it('line + min/max points + templated labels render the full dumbbell', () => {
     const svg = ggpbi()
-      .data(ocr as any)
-      .aes({ x: 'ocr', y: 'branche', label: 'tenant' })
+      .data(shares as any)
+      .aes({ x: 'share', y: 'category', label: 'product' })
       .geom('line', { color: '#C8D0D9', size: 2 })
       .geom('point', { filter: 'min', color: '#4E79A7', size: 5 })
       .geom('point', { filter: 'max', color: '#F28E2B', size: 5 })
@@ -165,29 +166,29 @@ describe('dumbbell chart end to end', () => {
       .size(640, 420)
       .renderTo(container);
 
-    // One segment per Branche.
+    // One segment per category.
     const segments = svg.querySelectorAll('.ggpbi-layer-line .ggpbi-line');
     expect(segments.length).toBe(2);
 
-    // Two dots per Branche: one blue (min), one orange (max).
+    // Two dots per category: one blue (min), one orange (max).
     const fills = Array.from(svg.querySelectorAll('.ggpbi-point')).map(p => p.getAttribute('fill'));
     expect(fills.filter(c => c === '#4E79A7').length).toBe(2);
     expect(fills.filter(c => c === '#F28E2B').length).toBe(2);
 
     // Templated labels: name + percent value.
     const labels = Array.from(svg.querySelectorAll('.ggpbi-geom-clip text')).map(t => t.textContent);
-    expect(labels.sort()).toEqual(['Hofer 4.0%', 'Kik 35.0%', 'Pepco 8.0%', 'SPAR 9.0%']);
+    expect(labels.sort()).toEqual(['Heron 3.0%', 'Kestrel 33.0%', 'Puffin 6.0%', 'Swift 7.0%']);
   });
 
   it('scales still train on the full data — the min layer does not shrink the x domain', () => {
     const svg = ggpbi()
-      .data(ocr as any)
-      .aes({ x: 'ocr', y: 'branche' })
+      .data(shares as any)
+      .aes({ x: 'share', y: 'category' })
       .geom('point', { filter: 'min', size: 5 })
       .size(640, 420)
       .renderTo(container);
 
-    // Axis must still cover Kik's 0.35 even though only min rows are drawn.
+    // Axis must still cover Kestrel's 0.33 even though only min rows are drawn.
     const ticks = Array.from(svg.querySelectorAll('.ggpbi-axis-x text')).map(t => t.textContent);
     const maxTick = Math.max(...ticks.map(t => parseFloat(String(t))).filter(Number.isFinite));
     expect(maxTick).toBeGreaterThanOrEqual(0.3);
